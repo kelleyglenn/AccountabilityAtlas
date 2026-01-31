@@ -117,7 +117,10 @@ CREATE TABLE content.videos (
     description TEXT,
     thumbnail_url VARCHAR(500),
     duration_seconds INTEGER,
-    video_date DATE,  -- When the incident occurred
+    channel_id VARCHAR(50),           -- YouTube channel ID
+    channel_name VARCHAR(255),        -- YouTube channel name
+    published_at TIMESTAMPTZ,         -- When video was published on YouTube
+    video_date DATE,                  -- When the incident occurred (user-provided)
     amendments VARCHAR(10)[] NOT NULL DEFAULT '{}',
     participants VARCHAR(20)[] NOT NULL DEFAULT '{}',
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
@@ -139,6 +142,7 @@ CREATE TABLE content.videos (
 CREATE INDEX idx_videos_youtube ON content.videos(youtube_id);
 CREATE INDEX idx_videos_status ON content.videos(status);
 CREATE INDEX idx_videos_submitted_by ON content.videos(submitted_by);
+CREATE INDEX idx_videos_channel ON content.videos(channel_id);
 CREATE INDEX idx_videos_amendments ON content.videos USING GIN(amendments);
 CREATE INDEX idx_videos_participants ON content.videos USING GIN(participants);
 CREATE INDEX idx_videos_created ON content.videos(created_at DESC);
@@ -314,6 +318,14 @@ CREATE INDEX idx_delivery_log_sent ON notifications.delivery_log(sent_at DESC);
         }
       },
       "description": { "type": "text", "analyzer": "video_analyzer" },
+      "channelId": { "type": "keyword" },
+      "channelName": {
+        "type": "text",
+        "fields": {
+          "keyword": { "type": "keyword" }
+        }
+      },
+      "publishedAt": { "type": "date" },
       "amendments": { "type": "keyword" },
       "participants": { "type": "keyword" },
       "videoDate": { "type": "date" },

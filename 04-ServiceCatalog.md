@@ -2,15 +2,16 @@
 
 ## Service Summary
 
-| Service | Port | Repository | Owner | Status |
-|---------|------|------------|-------|--------|
-| api-gateway | 8080 | /AcctAtlas-api-gateway | Platform Team | Planned |
-| user-service | 8081 | /AcctAtlas-user-service | Platform Team | Planned |
-| video-service | 8082 | /AcctAtlas-video-service | Content Team | Planned |
-| location-service | 8083 | /AcctAtlas-location-service | Content Team | Planned |
-| search-service | 8084 | /AcctAtlas-search-service | Content Team | Planned |
-| moderation-service | 8085 | /AcctAtlas-moderation-service | Trust & Safety | Planned |
-| notification-service | 8086 | /AcctAtlas-notification-service | Platform Team | Planned |
+| Service | Port | Repository | Status |
+|---------|------|------------|--------|
+| api-gateway | 8080 | /AcctAtlas-api-gateway | Planned |
+| user-service | 8081 | /AcctAtlas-user-service | Planned |
+| video-service | 8082 | /AcctAtlas-video-service | Planned |
+| location-service | 8083 | /AcctAtlas-location-service | Planned |
+| search-service | 8084 | /AcctAtlas-search-service | Planned |
+| moderation-service | 8085 | /AcctAtlas-moderation-service | Planned |
+| notification-service | 8086 | /AcctAtlas-notification-service | Planned |
+| web-app | 3000 | /AcctAtlas-web-app | Planned |
 
 ---
 
@@ -160,6 +161,10 @@ Video
 ├── description: String
 ├── thumbnailUrl: String
 ├── duration: Duration
+├── channelId: String
+├── channelName: String
+├── publishedAt: Timestamp (YouTube publish date)
+├── videoDate: Date (incident date, user-provided)
 ├── amendments: Set<Amendment> (FIRST, SECOND, FOURTH, FIFTH)
 ├── participants: Set<Participant> (POLICE, GOVERNMENT, BUSINESS, CITIZEN)
 ├── status: Enum (PENDING, APPROVED, REJECTED)
@@ -298,6 +303,7 @@ GET /search
 ├── q: String (search query)
 ├── amendments: String[] (filter)
 ├── participants: String[] (filter)
+├── channelId: String (filter)
 ├── dateFrom: Date (filter)
 ├── dateTo: Date (filter)
 ├── state: String (filter)
@@ -314,6 +320,9 @@ GET /search
   "youtubeId": "string",
   "title": "string",
   "description": "string",
+  "channelId": "string",
+  "channelName": "string",
+  "publishedAt": "2024-01-01T00:00:00Z",
   "amendments": ["FIRST", "FOURTH"],
   "participants": ["POLICE", "CITIZEN"],
   "submitterName": "string",

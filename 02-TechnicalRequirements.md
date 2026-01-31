@@ -119,6 +119,36 @@
 | SendGrid/SES | Transactional email | REST API |
 | OAuth Providers | Google, Apple login | OAuth 2.0/OIDC |
 
+### External API Integration Patterns
+
+All backend services calling external APIs must implement these patterns:
+
+**Resilience**
+- Circuit breakers to prevent cascade failures when external APIs are unavailable
+- Retry with exponential backoff (max 3 retries, 1s/2s/4s delays)
+- Timeouts: 5 seconds for metadata fetches, 10 seconds for bulk operations
+
+**Caching**
+- Cache external API responses to reduce quota usage and latency
+- YouTube metadata: cache for 24 hours (title, description, channel rarely change)
+- Geocoding results: cache indefinitely (addresses don't move)
+
+**Rate Limiting**
+- Implement client-side rate limiting to respect API quotas
+- YouTube Data API: 10,000 units/day default quota
+  - videos.list: 1 unit per call
+  - Batch requests where possible to reduce quota consumption
+
+**Fallback Behavior**
+- Graceful degradation when external APIs are unavailable
+- Return cached data if available, even if stale
+- Queue failed requests for retry when service recovers
+
+**Error Handling**
+- Map external API errors to internal error responses
+- Log external API failures with correlation IDs for debugging
+- Alert on elevated external API error rates
+
 ### API Requirements
 - RESTful API design following OpenAPI 3.0 specification
 - JSON request/response format
