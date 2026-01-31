@@ -241,10 +241,11 @@ Subnets:
                     │
               ┌─────┴─────┐
               ▼           ▼
-         ┌────────┐  ┌────────┐
-         │ Tests  │  │ Lint   │
-         │(JUnit) │  │(ktlint)│
-         └────────┘  └────────┘
+         ┌────────┐  ┌─────────────┐
+         │ Tests  │  │ Lint/Analyze│
+         │(JUnit) │  │(Spotless,   │
+         └────────┘  │Error Prone) │
+                     └─────────────┘
 ```
 
 ### Pipeline Stages
@@ -252,7 +253,7 @@ Subnets:
 1. **Source**: GitHub webhook on push to main/develop
 2. **Build**:
    - Run tests (JUnit, integration tests)
-   - Run linter (ktlint)
+   - Run code quality checks (Spotless formatting, Error Prone static analysis)
    - Build Docker image
    - Push to ECR
 3. **Deploy Dev**: Auto-deploy on develop branch

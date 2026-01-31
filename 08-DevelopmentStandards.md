@@ -25,6 +25,8 @@
 | Testing | JUnit 5, Mockito, TestContainers |
 | Logging | SLF4J + Logback |
 | Metrics | Micrometer |
+| Code Formatting | Spotless (google-java-format) |
+| Static Analysis | Error Prone, SonarLint |
 
 ---
 
@@ -234,6 +236,138 @@ public class VideoService {
     }
 }
 ```
+
+---
+
+## Code Quality Tools
+
+### Java (Backend Services)
+
+#### Spotless (Code Formatting)
+
+Enforces consistent code style using [google-java-format](https://github.com/google/google-java-format).
+
+```gradle
+// build.gradle
+plugins {
+    id 'com.diffplug.spotless' version '6.25.0'
+}
+
+spotless {
+    java {
+        googleJavaFormat('1.19.2')
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+```
+
+Commands:
+- `./gradlew spotlessCheck` - Check formatting (CI)
+- `./gradlew spotlessApply` - Auto-fix formatting issues
+
+#### Error Prone (Static Analysis)
+
+Catches common Java bugs at compile time.
+
+```gradle
+// build.gradle
+plugins {
+    id 'net.ltgt.errorprone' version '3.1.0'
+}
+
+dependencies {
+    errorprone 'com.google.errorprone:error_prone_core:2.24.1'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.errorprone {
+        disableWarningsInGeneratedCode = true
+        error('NullAway')  // Promote NullAway to error
+    }
+}
+```
+
+#### SonarLint (IDE Integration)
+
+Real-time code quality feedback in the IDE.
+
+- **IntelliJ IDEA**: Install SonarLint plugin from Marketplace
+- **VS Code**: Install SonarLint extension
+- **Configuration**: Connect to SonarCloud for team-shared rules (optional)
+
+SonarLint detects:
+- Code smells and maintainability issues
+- Security vulnerabilities (OWASP Top 10)
+- Bug patterns specific to Spring Boot
+
+### TypeScript (Frontend / Web App)
+
+#### ESLint (Linting)
+
+```json
+// .eslintrc.json
+{
+  "extends": [
+    "next/core-web-vitals",
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react-hooks/recommended",
+    "prettier"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/explicit-function-return-type": "off",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn"
+  }
+}
+```
+
+#### Prettier (Code Formatting)
+
+```json
+// .prettierrc
+{
+  "semi": true,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "es5",
+  "printWidth": 100
+}
+```
+
+#### Package Scripts
+
+```json
+// package.json
+{
+  "scripts": {
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\""
+  }
+}
+```
+
+#### Required Dependencies
+
+```bash
+npm install -D eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin \
+  eslint-config-prettier eslint-plugin-react-hooks prettier
+```
+
+### CI Integration Summary
+
+| Language | Formatting | Static Analysis | IDE Support |
+|----------|------------|-----------------|-------------|
+| Java 21 | Spotless (google-java-format) | Error Prone | SonarLint |
+| TypeScript | Prettier | ESLint | ESLint + Prettier extensions |
 
 ---
 
@@ -512,7 +646,7 @@ test(video): add integration tests for submission flow
 - All tests passing
 - Code review approval (1 minimum)
 - No merge conflicts
-- Passing linter checks
+- Passing code quality checks (Spotless, Error Prone, ESLint)
 
 ---
 
@@ -557,8 +691,11 @@ jobs:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
 
-      - name: Run Checkstyle
-        run: ./gradlew checkstyleMain checkstyleTest
+      - name: Check code formatting (Spotless)
+        run: ./gradlew spotlessCheck
+
+      - name: Run static analysis (Error Prone)
+        run: ./gradlew compileJava
 
       - name: Run tests
         run: ./gradlew test
@@ -608,8 +745,11 @@ docker-compose up -d postgres redis
 # Run tests
 ./gradlew test
 
-# Run Checkstyle
-./gradlew checkstyleMain
+# Check code formatting
+./gradlew spotlessCheck
+
+# Auto-fix formatting issues
+./gradlew spotlessApply
 ```
 
 ### docker-compose.yml (Local Development)
