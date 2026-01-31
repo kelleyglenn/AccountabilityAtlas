@@ -151,6 +151,7 @@ Core content service managing video records, metadata, and associations.
 | GET | /videos/{id}/locations | Public | Get video locations |
 | POST | /videos/{id}/locations | Owner | Add location to video |
 | DELETE | /videos/{id}/locations/{locId} | Owner | Remove location |
+| GET | /videos/user/{userId} | Public | Get user's submissions |
 
 ### Domain Model
 ```
@@ -160,14 +161,14 @@ Video
 ├── title: String
 ├── description: String
 ├── thumbnailUrl: String
-├── duration: Duration
+├── durationSeconds: Integer
 ├── channelId: String
 ├── channelName: String
 ├── publishedAt: Timestamp (YouTube publish date)
 ├── videoDate: Date (incident date, user-provided)
 ├── amendments: Set<Amendment> (FIRST, SECOND, FOURTH, FIFTH)
 ├── participants: Set<Participant> (POLICE, GOVERNMENT, BUSINESS, CITIZEN)
-├── status: Enum (PENDING, APPROVED, REJECTED)
+├── status: Enum (PENDING, APPROVED, REJECTED, DELETED)
 ├── submittedBy: UUID (User reference)
 ├── locations: List<VideoLocation>
 ├── createdAt: Timestamp
@@ -185,15 +186,20 @@ VideoLocation
 | Event | Trigger | Consumers |
 |-------|---------|-----------|
 | VideoSubmitted | New submission | moderation-service |
-| VideoApproved | Moderation approval | search-service, location-service |
 | VideoUpdated | Metadata update | search-service |
 | VideoDeleted | Video removal | search-service, location-service |
+
+### Events Consumed
+| Event | Action |
+|-------|--------|
+| VideoApproved | Update video status to APPROVED |
+| VideoRejected | Update video status to REJECTED |
 
 ### Dependencies
 - PostgreSQL (video data)
 - YouTube Data API (metadata fetching)
 - location-service (location validation)
-- SQS (event publishing)
+- SQS (event publishing and consumption)
 
 ---
 
@@ -402,7 +408,7 @@ AbuseReport
 ├── contentType: Enum
 ├── contentId: UUID
 ├── reporterId: UUID
-├── reason: Enum (SPAM, INAPPROPRIATE, COPYRIGHT, OTHER)
+├── reason: Enum (SPAM, INAPPROPRIATE, COPYRIGHT, MISINFORMATION, OTHER)
 ├── description: String
 ├── status: Enum (OPEN, RESOLVED, DISMISSED)
 ├── resolvedBy: UUID (nullable)
