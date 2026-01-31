@@ -305,15 +305,19 @@ deployment:
 
 ### Alarms
 
-| Alarm | Metric | Threshold | Action |
-|-------|--------|-----------|--------|
-| High Error Rate | 5XX errors | > 5% for 5 min | PagerDuty |
-| High Latency | P95 latency | > 1s for 5 min | Slack |
-| Low Healthy Hosts | Healthy count | < 2 for 2 min | PagerDuty |
-| Database CPU | CPU utilization | > 80% for 10 min | Slack |
-| Database Connections | Connection count | > 80% max for 5 min | Slack |
-| Search Cluster Red | Cluster status | RED | PagerDuty |
-| Queue Depth | ApproximateNumberOfMessages | > 1000 | Slack |
+| Alarm | Metric | Threshold | Severity | Action |
+|-------|--------|-----------|----------|--------|
+| High Error Rate | 5XX errors | > 5% for 5 min | Critical | SMS + Email |
+| High Latency | P95 latency | > 1s for 5 min | Warning | Email |
+| Low Healthy Hosts | Healthy count | < 2 for 2 min | Critical | SMS + Email |
+| Database CPU | CPU utilization | > 80% for 10 min | Warning | Email |
+| Database Connections | Connection count | > 80% max for 5 min | Warning | Email |
+| Search Cluster Red | Cluster status | RED | Critical | SMS + Email |
+| Queue Depth | ApproximateNumberOfMessages | > 1000 | Warning | Email |
+
+**Scaling alerting infrastructure**: As user base grows significantly, consider upgrading to:
+- **PagerDuty** for critical alarms - adds on-call scheduling, escalation policies, and acknowledgment tracking
+- **Slack** for warning alarms - improves team visibility and enables quick collaboration on issues
 
 ### Distributed Tracing (X-Ray)
 
