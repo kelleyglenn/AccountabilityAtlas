@@ -67,3 +67,4 @@ AccountabilityAtlas is a geo-located video curation platform focused on constitu
 | [06-SecurityArchitecture.md](06-SecurityArchitecture.md) | Authentication, authorization, and security controls |
 | [07-InfrastructureArchitecture.md](07-InfrastructureArchitecture.md) | AWS infrastructure and deployment architecture |
 | [08-DevelopmentStandards.md](08-DevelopmentStandards.md) | Coding standards, testing, and CI/CD practices |
+| [09-CostEstimate.md](09-CostEstimate.md) | Detailed cost breakdown by environment and service |
