@@ -370,7 +370,9 @@ CREATE TABLE notifications.delivery_log (
     status VARCHAR(20) NOT NULL,
     provider_message_id VARCHAR(255),
     error_message TEXT,
-    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT valid_status CHECK (status IN ('SENT', 'DELIVERED', 'BOUNCED', 'FAILED'))
 );
 
 CREATE INDEX idx_delivery_log_user ON notifications.delivery_log(user_id);
