@@ -615,10 +615,10 @@ feature/AA-123-add-video-search
 
 ### Commit Messages
 
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
+Follow [Conventional Commits](https://www.conventionalcommits.org/). Include the GitHub issue number when applicable:
 
 ```
-<type>(<scope>): <description>
+<type>(<scope>): <description> (#issue)
 
 [optional body]
 
@@ -629,21 +629,21 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
 Examples:
 ```
-feat(video): add amendment filtering to video list
+feat(video): add amendment filtering to video list (#42)
 
-fix(auth): correct JWT expiry calculation
+fix(auth): correct JWT expiry calculation (#15)
 
-docs(api): update OpenAPI spec for search endpoint
+docs(api): update OpenAPI spec for search endpoint (#31)
 
-refactor(location): extract clustering logic to separate service
+refactor(location): extract clustering logic to separate service (#28)
 
-test(video): add integration tests for submission flow
+test(video): add integration tests for submission flow (#45)
 ```
 
 ### Pull Request Requirements
 
 - Descriptive title and description
-- Link to related ticket/issue
+- Use [GitHub keywords](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue) to link issues: `Closes #42`, `Fixes #15`, or `Resolves #23`
 - All tests passing
 - Code review approval (1 minimum)
 - No merge conflicts
