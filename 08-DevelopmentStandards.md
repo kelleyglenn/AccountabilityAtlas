@@ -40,7 +40,8 @@ service-name/
 ├── settings.gradle
 ├── Dockerfile
 ├── docker-compose.yml
-├── TechnicalDocumentation/
+├── docs/
+│   ├── technical.md
 │   ├── api-specification.yaml
 │   ├── database-schema.md
 │   └── design-decisions.md
@@ -411,7 +412,7 @@ GET /api/v1/videos?amendments=FIRST,FOURTH&status=APPROVED&page=0&size=20
 Every service must provide an OpenAPI 3.0 specification:
 
 ```yaml
-# TechnicalDocumentation/api-specification.yaml
+# docs/api-specification.yaml
 openapi: 3.0.3
 info:
   title: Video Service API
