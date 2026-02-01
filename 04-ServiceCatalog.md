@@ -25,7 +25,7 @@ Central entry point for all client traffic. Handles cross-cutting concerns befor
 |-----------|------------|
 | Framework | Spring Cloud Gateway |
 | Language | Java 21 |
-| Build Tool | Gradle |
+| Build Tool | Gradle 9.x |
 
 ### Responsibilities
 - Request routing based on path/headers
@@ -62,7 +62,7 @@ Manages user identity, authentication, authorization, and trust tiers.
 |-----------|------------|
 | Framework | Spring Boot 3.x |
 | Language | Java 21 |
-| Build Tool | Gradle |
+| Build Tool | Gradle 9.x |
 | Database | PostgreSQL |
 | Cache | Redis |
 
@@ -129,7 +129,7 @@ Core content service managing video records, metadata, and associations.
 |-----------|------------|
 | Framework | Spring Boot 3.x |
 | Language | Java 21 |
-| Build Tool | Gradle |
+| Build Tool | Gradle 9.x |
 | Database | PostgreSQL |
 
 ### Responsibilities
@@ -213,7 +213,7 @@ Manages geospatial data, provides spatial queries, and handles map clustering.
 |-----------|------------|
 | Framework | Spring Boot 3.x |
 | Language | Java 21 |
-| Build Tool | Gradle |
+| Build Tool | Gradle 9.x |
 | Database | PostgreSQL + PostGIS |
 | Cache | Redis |
 
@@ -285,7 +285,7 @@ Provides full-text and faceted search across video content.
 |-----------|------------|
 | Framework | Spring Boot 3.x |
 | Language | Java 21 |
-| Build Tool | Gradle |
+| Build Tool | Gradle 9.x |
 | Search Engine | OpenSearch |
 
 ### Responsibilities
@@ -368,7 +368,7 @@ Manages content moderation workflow and user trust progression.
 |-----------|------------|
 | Framework | Spring Boot 3.x |
 | Language | Java 21 |
-| Build Tool | Gradle |
+| Build Tool | Gradle 9.x |
 | Database | PostgreSQL |
 
 ### Responsibilities
@@ -453,7 +453,7 @@ Handles all user-facing communications via email.
 |-----------|------------|
 | Framework | Spring Boot 3.x |
 | Language | Java 21 |
-| Build Tool | Gradle |
+| Build Tool | Gradle 9.x |
 | Database | PostgreSQL |
 | Email Provider | Amazon SES |
 

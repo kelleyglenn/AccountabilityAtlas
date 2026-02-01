@@ -8,7 +8,7 @@
 |-----------|------------|---------|
 | Language | Java | 21 LTS |
 | Framework | Spring Boot | 3.2.x |
-| Build Tool | Gradle | 8.x |
+| Build Tool | Gradle | 9.x |
 | JDK | Amazon Corretto | 21 LTS |
 | Container | Docker | 24.x |
 | API Documentation | OpenAPI / Springdoc | 3.0 |

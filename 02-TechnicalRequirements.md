@@ -99,7 +99,7 @@
 | Cache | Redis 7.x | Session, caching, rate limiting |
 | Message Queue | Amazon SQS | Async processing, decoupling |
 | Container Runtime | Docker 24.x | Consistent environments |
-| Build Tool | Gradle 8.x | Build automation |
+| Build Tool | Gradle 9.x | Build automation |
 | Container Orchestration | Amazon ECS Fargate | Serverless containers |
 | Cloud Provider | AWS | Team familiarity, service breadth |
 
