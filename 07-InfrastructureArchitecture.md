@@ -12,12 +12,12 @@
 
 | Service | Purpose | Environment |
 |---------|---------|-------------|
-| ECS Fargate | Container orchestration | Dev, Staging, Prod |
-| ALB | Load balancing | Dev, Staging, Prod |
-| RDS PostgreSQL | Primary database | Dev, Staging, Prod |
-| ElastiCache Redis | Caching, sessions | Dev, Staging, Prod |
+| ECS Fargate | Container orchestration | Staging, Prod |
+| ALB | Load balancing | Staging, Prod |
+| RDS PostgreSQL | Primary database | Staging, Prod |
+| ElastiCache Redis | Caching, sessions | Staging, Prod |
 | OpenSearch Service | Full-text search | Staging, Prod |
-| SQS | Message queuing | Dev, Staging, Prod |
+| SQS | Message queuing | Staging, Prod |
 | S3 | Static assets, backups | All |
 | CloudFront | CDN | Prod |
 | Route 53 | DNS | All |
@@ -33,33 +33,6 @@
 ---
 
 ## Environment Topology
-
-### Development Environment
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    DEV (us-east-1)                          │
-│                                                              │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │                  ECS Cluster (dev)                    │   │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐    │   │
-│  │  │api-gw   │ │user-svc │ │video-svc│ │location │    │   │
-│  │  │(1 task) │ │(1 task) │ │(1 task) │ │(1 task) │    │   │
-│  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘    │   │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐                │   │
-│  │  │search   │ │mod-svc  │ │notif-svc│                │   │
-│  │  │(1 task) │ │(1 task) │ │(1 task) │                │   │
-│  │  └─────────┘ └─────────┘ └─────────┘                │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │RDS Postgres │  │ ElastiCache │  │     SQS     │         │
-│  │(db.t3.small)│  │(cache.t3.sm)│  │   Queues    │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-└─────────────────────────────────────────────────────────────┘
-
-Note: Dev uses local OpenSearch or shared staging instance
-```
 
 ### Staging Environment
 
@@ -270,19 +243,17 @@ Subnets:
 
 ### Pipeline Stages
 
-1. **Source**: GitHub webhook on push to main/develop
+1. **Source**: GitHub webhook on push to main
 2. **Build**:
    - Run tests (JUnit, integration tests)
    - Run code quality checks (Spotless formatting, Error Prone static analysis)
    - Build Docker image
    - Push to ECR
-3. **Deploy Dev**: Auto-deploy on develop branch
-4. **Deploy Staging**: Auto-deploy on main branch
-5. **Deploy Production**: Manual approval required
+3. **Deploy Staging**: Auto-deploy on main branch
+4. **Deploy Production**: Manual approval required
 
 ### Deployment Strategy
 
-- **Development**: Rolling deployment
 - **Staging**: Blue-green deployment
 - **Production**: Blue-green deployment with canary
 

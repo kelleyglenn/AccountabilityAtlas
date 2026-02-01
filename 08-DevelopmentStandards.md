@@ -588,29 +588,29 @@ COMMENT ON COLUMN content.videos.video_date IS
 
 ## Git Workflow
 
-### Branch Strategy
+### Branch Strategy (GitHub Flow)
+
+We use [GitHub Flow](https://docs.github.com/en/get-started/using-github/github-flow), a lightweight branch-based workflow optimized for small teams and continuous deployment.
 
 ```
 main (protected)
-├── Production deployments
+├── Always deployable
 ├── Requires PR approval
-└── Triggers staging deploy on merge
-
-develop
-├── Integration branch
-├── Auto-deploys to dev environment
-└── PRs merged here first
+└── Auto-deploys to staging, manual promotion to production
 
 feature/AA-123-add-video-search
-├── Feature development
-├── Named: feature/{ticket}-{description}
-└── PR to develop
-
-hotfix/AA-456-fix-auth-bug
-├── Production fixes
-├── PR to main AND develop
-└── Named: hotfix/{ticket}-{description}
+├── Created from main
+├── Named: feature/{ticket}-{description} or fix/{ticket}-{description}
+├── PR to main when ready
+└── Delete after merge
 ```
+
+**Workflow:**
+1. Create a branch from `main` with a descriptive name
+2. Make changes and commit with conventional commit messages
+3. Open a pull request to `main`
+4. After review and approval, merge to `main`
+5. Changes auto-deploy to staging; promote to production after verification
 
 ### Commit Messages
 
@@ -660,9 +660,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 jobs:
   build:
@@ -706,13 +706,13 @@ jobs:
       - name: Build Docker image
         run: docker build -t ${{ github.repository }}:${{ github.sha }} .
 
-  deploy-dev:
+  deploy-staging:
     needs: build
-    if: github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to dev
-        run: echo "Deploy to dev environment"
+      - name: Deploy to staging
+        run: echo "Deploy to staging environment"
         # AWS deployment steps
 ```
 

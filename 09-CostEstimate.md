@@ -11,89 +11,12 @@ This document provides detailed monthly cost estimates for AccountabilityAtlas i
 
 | Environment | Monthly Cost (On-Demand) | With Reserved Instances |
 |-------------|--------------------------|-------------------------|
-| Development | ~$280 | N/A |
 | Staging | ~$570 | N/A |
 | Production | ~$2,370 | ~$1,825 |
 | External APIs (with caching) | ~$25 | ~$25 |
-| **Total** | **~$3,245** | **~$2,700** |
+| **Total** | **~$2,965** | **~$2,420** |
 
 *All estimates include 20% buffer. Caching ensures external API costs remain stable as traffic grows - see [External API Costs](#external-api-costs).*
-
----
-
-## Development Environment
-
-### Compute (ECS Fargate)
-
-| Service | Tasks | vCPU | Memory (GB) | Hours/Month | Cost |
-|---------|-------|------|-------------|-------------|------|
-| api-gateway | 1 | 0.5 | 1 | 730 | $18.98 |
-| user-service | 1 | 0.5 | 1 | 730 | $18.98 |
-| video-service | 1 | 0.5 | 1 | 730 | $18.98 |
-| location-service | 1 | 0.5 | 1 | 730 | $18.98 |
-| search-service | 1 | 0.5 | 1 | 730 | $18.98 |
-| moderation-service | 1 | 0.25 | 0.5 | 730 | $9.49 |
-| notification-service | 1 | 0.25 | 0.5 | 730 | $9.49 |
-
-**Fargate Pricing**: $0.04048/vCPU-hour + $0.004445/GB-hour
-
-**Subtotal**: ~$114/month
-
-### Database (RDS PostgreSQL)
-
-| Setting | Value | Monthly Cost |
-|---------|-------|--------------|
-| Instance | db.t3.small (2 vCPU, 2 GB) | $25.55 |
-| Storage | 20 GB gp3 | $2.30 |
-| Backup | 1 day retention | Included |
-
-**Subtotal**: ~$28/month
-
-### Cache (ElastiCache Redis)
-
-| Setting | Value | Monthly Cost |
-|---------|-------|--------------|
-| Node Type | cache.t3.small | $24.82 |
-| Nodes | 1 | - |
-
-**Subtotal**: ~$25/month
-
-### Networking
-
-| Service | Monthly Cost |
-|---------|--------------|
-| ALB (hourly + minimal LCU) | $22.27 |
-| NAT Gateway (1 AZ) | $32.85 |
-| NAT Data Transfer (50 GB est.) | $2.25 |
-
-**Subtotal**: ~$57/month
-
-### Other Services
-
-| Service | Monthly Cost |
-|---------|--------------|
-| Route 53 (1 hosted zone) | $0.50 |
-| Secrets Manager (~10 secrets) | $4.00 |
-| ECR (5 GB storage) | $0.50 |
-| CloudWatch Logs (5 GB ingestion) | $2.50 |
-| CloudWatch Alarms (5 alarms) | $0.50 |
-| SQS (100K requests) | $0.04 |
-| S3 (10 GB) | $0.23 |
-
-**Subtotal**: ~$8/month
-
-### Development Environment Total
-
-| Category | Monthly Cost |
-|----------|--------------|
-| Compute (Fargate) | $114 |
-| Database (RDS) | $28 |
-| Cache (Redis) | $25 |
-| Networking | $57 |
-| Other Services | $8 |
-| **Subtotal** | $232 |
-| **Buffer (20%)** | $46 |
-| **Total** | **~$280** |
 
 ---
 
@@ -346,23 +269,21 @@ Per [05-DataArchitecture.md](05-DataArchitecture.md), YouTube metadata is cached
 
 | Item | Monthly | Annual |
 |------|---------|--------|
-| Development | $350 | $4,200 |
 | Staging | $700 | $8,400 |
 | Production (On-Demand) | $2,370 | $28,440 |
 | Google Maps (with caching) | $25 | $300 |
-| **Total (On-Demand)** | **$3,445** | **$41,340** |
+| **Total (On-Demand)** | **$3,095** | **$37,140** |
 
 ### Year 1 Costs (With Reserved Instances)
 
 | Item | Monthly | Annual |
 |------|---------|--------|
-| Development | $350 | $4,200 |
 | Staging | $700 | $8,400 |
 | Production (Reserved) | $1,825 | $21,900 |
 | Google Maps (with caching) | $25 | $300 |
-| **Total** | **$2,900** | **$34,800** |
+| **Total** | **$2,550** | **$30,600** |
 
-**Savings with Reserved Instances**: ~$6,500/year (16%)
+**Savings with Reserved Instances**: ~$6,500/year (17%)
 
 *Note: Caching keeps Google Maps costs stable at ~$25/month regardless of traffic growth.*
 
@@ -388,9 +309,7 @@ Based on documented growth targets:
 
 1. **Purchase Reserved Instances** for production RDS, ElastiCache, and OpenSearch (saves ~$6,500/year)
 
-2. **Shut down dev environment** outside business hours (saves ~$150/month)
-
-3. **Use Spot instances for staging** Fargate tasks where interruption is acceptable (saves 70%)
+2. **Use Spot instances for staging** Fargate tasks where interruption is acceptable (saves 70%)
 
 4. **Aggressive caching implemented** - Redis caching for geocoding (30-day TTL) and YouTube metadata (24-hour TTL) keeps API costs stable (~$25/month) regardless of traffic growth. See [05-DataArchitecture.md](05-DataArchitecture.md) for cache key patterns.
 
