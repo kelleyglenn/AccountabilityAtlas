@@ -11,10 +11,13 @@ This document provides detailed monthly cost estimates for AccountabilityAtlas i
 
 | Environment | Monthly Cost (On-Demand) | With Reserved Instances |
 |-------------|--------------------------|-------------------------|
-| Development | ~$350 - $450 | N/A |
-| Staging | ~$650 - $850 | N/A |
-| Production | ~$2,200 - $3,000 | ~$1,600 - $2,200 |
-| **Total** | **~$3,200 - $4,300** | **~$2,600 - $3,500** |
+| Development | ~$280 | N/A |
+| Staging | ~$570 | N/A |
+| Production | ~$2,370 | ~$1,825 |
+| External APIs (with caching) | ~$25 | ~$25 |
+| **Total** | **~$3,245** | **~$2,700** |
+
+*All estimates include 20% buffer. Caching ensures external API costs remain stable as traffic grows - see [External API Costs](#external-api-costs).*
 
 ---
 
@@ -88,8 +91,9 @@ This document provides detailed monthly cost estimates for AccountabilityAtlas i
 | Cache (Redis) | $25 |
 | Networking | $57 |
 | Other Services | $8 |
+| **Subtotal** | $232 |
 | **Buffer (20%)** | $46 |
-| **Total** | **~$280 - $350** |
+| **Total** | **~$280** |
 
 ---
 
@@ -174,8 +178,9 @@ This document provides detailed monthly cost estimates for AccountabilityAtlas i
 | Search (OpenSearch) | $29 |
 | Networking | $92 |
 | Other Services | $15 |
+| **Subtotal** | $473 |
 | **Buffer (20%)** | $95 |
-| **Total** | **~$570 - $700** |
+| **Total** | **~$570** |
 
 ---
 
@@ -307,9 +312,20 @@ Based on baseline 3 tasks per service (scales 2-10 based on load):
 | Geocoding | $200 credit | $5.00/1K requests | 5K requests | $25 |
 | Places Autocomplete | $200 credit | $2.83/1K requests | 2K requests | $6 |
 
-**Note**: Google provides $200/month free credit. Light usage may stay within free tier.
+**Note**: Google provides $200/month free credit. Light usage stays within free tier.
 
-**Estimated**: $0 - $50/month depending on usage
+**Estimated**: ~$25/month
+
+#### Caching Strategy (Implemented)
+
+Per [05-DataArchitecture.md](05-DataArchitecture.md), external API responses are cached in Redis to control costs as traffic grows:
+
+| Cache | TTL | Benefit |
+|-------|-----|---------|
+| `extapi:geocode:{hash}` | 30 days | Same address lookups hit cache, not API |
+| `extapi:reverse:{lat}:{lng}` | 30 days | Same coordinate lookups hit cache |
+
+**Impact**: Caching ensures API costs remain stable (~$25/month) even as user traffic increases significantly. Without caching, costs would scale linearly with usage and quickly exceed the free tier.
 
 ### YouTube Data API
 
@@ -318,7 +334,9 @@ Based on baseline 3 tasks per service (scales 2-10 based on load):
 | Default | 10,000 units/day | Free |
 | Overage | Request quota increase | Free (approval required) |
 
-**Estimated**: $0/month (free tier sufficient for documented usage)
+Per [05-DataArchitecture.md](05-DataArchitecture.md), YouTube metadata is cached at `extapi:youtube:{videoId}` with 24-hour TTL (95%+ cache hit rate expected).
+
+**Estimated**: $0/month (caching keeps usage well within free tier)
 
 ---
 
@@ -331,7 +349,7 @@ Based on baseline 3 tasks per service (scales 2-10 based on load):
 | Development | $350 | $4,200 |
 | Staging | $700 | $8,400 |
 | Production (On-Demand) | $2,370 | $28,440 |
-| Google Maps (estimate) | $25 | $300 |
+| Google Maps (with caching) | $25 | $300 |
 | **Total (On-Demand)** | **$3,445** | **$41,340** |
 
 ### Year 1 Costs (With Reserved Instances)
@@ -341,10 +359,12 @@ Based on baseline 3 tasks per service (scales 2-10 based on load):
 | Development | $350 | $4,200 |
 | Staging | $700 | $8,400 |
 | Production (Reserved) | $1,825 | $21,900 |
-| Google Maps (estimate) | $25 | $300 |
+| Google Maps (with caching) | $25 | $300 |
 | **Total** | **$2,900** | **$34,800** |
 
 **Savings with Reserved Instances**: ~$6,500/year (16%)
+
+*Note: Caching keeps Google Maps costs stable at ~$25/month regardless of traffic growth.*
 
 ---
 
@@ -372,7 +392,7 @@ Based on documented growth targets:
 
 3. **Use Spot instances for staging** Fargate tasks where interruption is acceptable (saves 70%)
 
-4. **Implement aggressive caching** to reduce Google Maps API calls
+4. **Aggressive caching implemented** - Redis caching for geocoding (30-day TTL) and YouTube metadata (24-hour TTL) keeps API costs stable (~$25/month) regardless of traffic growth. See [05-DataArchitecture.md](05-DataArchitecture.md) for cache key patterns.
 
 5. **Right-size instances** based on actual utilization after launch
 
@@ -398,3 +418,4 @@ Based on documented growth targets:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2025-01-31 | Claude | Initial cost estimate |
+| 1.1 | 2025-01-31 | Claude | Document caching strategy, fix cost calculations, add subtotals |

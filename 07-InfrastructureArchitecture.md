@@ -81,9 +81,11 @@ Note: Dev uses local OpenSearch or shared staging instance
 │                                                              │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
 │  │RDS Postgres │  │ ElastiCache │  │  OpenSearch │         │
-│  │(db.t3.medium│  │(cache.t3.med│  │(t3.small.se)│         │
+│  │db.t3.medium │  │cache.t3.med │  │t3.small.srch│         │
 │  └─────────────┘  └─────────────┘  └─────────────┘         │
 └─────────────────────────────────────────────────────────────┘
+
+Note: Instance types abbreviated for diagram. Full names: cache.t3.medium, t3.small.search
 ```
 
 ### Production Environment
@@ -116,11 +118,13 @@ Note: Dev uses local OpenSearch or shared staging instance
 │                                                              │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
 │  │RDS Postgres │  │ ElastiCache │  │  OpenSearch │         │
-│  │(db.r6g.large│  │(cache.r6g.lg│  │(r6g.large.se│         │
-│  │Multi-AZ    │  │ 2-node clust│  │ 3-node clust│         │
-│  │Read replica│  └─────────────┘  └─────────────┘         │
+│  │db.r6g.large │  │cache.r6g.lg │  │r6g.large.src│         │
+│  │Multi-AZ     │  │ 2-node clust│  │ 3-node clust│         │
+│  │Read replica │  └─────────────┘  └─────────────┘         │
 │  └─────────────┘                                            │
 └─────────────────────────────────────────────────────────────┘
+
+Note: Instance types abbreviated for diagram. Full names: db.r6g.large, cache.r6g.large, r6g.large.search
 ```
 
 ---
@@ -138,6 +142,22 @@ Note: Dev uses local OpenSearch or shared staging instance
 | search-service | 512 | 1024 | 8084 | /actuator/health |
 | moderation-service | 256 | 512 | 8085 | /actuator/health |
 | notification-service | 256 | 512 | 8086 | /actuator/health |
+| web-app | 512 | 1024 | 3000 | /api/health |
+
+### Web Application Hosting
+
+The Next.js web application is deployed as a containerized service on ECS Fargate, with static assets served through CloudFront.
+
+| Environment | Tasks | CloudFront | Notes |
+|-------------|-------|------------|-------|
+| Dev | 1 | No | Direct ALB access |
+| Staging | 2 | No | Direct ALB access |
+| Production | 2-5 | Yes | CloudFront CDN for static assets |
+
+**Production Architecture**:
+- CloudFront serves static assets (JS, CSS, images) from S3
+- Dynamic requests (SSR, API routes) route to ECS via ALB
+- Next.js runs in standalone output mode for container deployment
 
 ### Auto-Scaling Configuration
 

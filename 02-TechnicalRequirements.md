@@ -91,14 +91,15 @@
 ### Required Technologies
 | Layer | Technology | Rationale |
 |-------|------------|-----------|
-| Backend Language | Java 21 | Team expertise, JVM ecosystem |
-| Backend Framework | Spring Boot 3.x | Production-ready, extensive ecosystem |
+| Backend Language | Java 21 LTS (Amazon Corretto) | Team expertise, JVM ecosystem |
+| Backend Framework | Spring Boot 3.2.x | Production-ready, extensive ecosystem |
 | API Protocol | REST + OpenAPI 3.0 | Industry standard, tooling support |
-| Primary Database | PostgreSQL 15+ with PostGIS | Relational + spatial queries |
-| Search Engine | OpenSearch | Full-text + faceted search |
-| Cache | Redis | Session, caching, rate limiting |
+| Primary Database | PostgreSQL 15 with PostGIS | Relational + spatial queries |
+| Search Engine | OpenSearch 2.x | Full-text + faceted search |
+| Cache | Redis 7.x | Session, caching, rate limiting |
 | Message Queue | Amazon SQS | Async processing, decoupling |
-| Container Runtime | Docker | Consistent environments |
+| Container Runtime | Docker 24.x | Consistent environments |
+| Build Tool | Gradle 8.x | Build automation |
 | Container Orchestration | Amazon ECS Fargate | Serverless containers |
 | Cloud Provider | AWS | Team familiarity, service breadth |
 
@@ -131,7 +132,7 @@ All backend services calling external APIs must implement these patterns:
 **Caching**
 - Cache external API responses to reduce quota usage and latency
 - YouTube metadata: cache for 24 hours (title, description, channel rarely change)
-- Geocoding results: cache indefinitely (addresses don't move)
+- Geocoding results: cache for 30 days (addresses rarely change, allows eventual refresh)
 
 **Rate Limiting**
 - Implement client-side rate limiting to respect API quotas

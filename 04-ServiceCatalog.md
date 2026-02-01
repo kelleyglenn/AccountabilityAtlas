@@ -44,7 +44,7 @@ Central entry point for all client traffic. Handles cross-cutting concerns befor
 | * | /api/v1/locations/** | location-service | Location operations |
 | * | /api/v1/search/** | search-service | Search queries |
 | * | /api/v1/moderation/** | moderation-service | Moderation queue |
-| GET | /health | - | Gateway health check |
+| GET | /actuator/health | - | Gateway health check (Spring Boot Actuator) |
 
 ### Dependencies
 - Redis (rate limiting, session cache)
