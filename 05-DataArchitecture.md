@@ -364,6 +364,56 @@ CREATE INDEX idx_delivery_log_sent ON notifications.delivery_log(sent_at DESC);
 | `cache:video:{id}` | String | 5 min | Video detail cache |
 | `cache:cluster:{bbox}:{zoom}` | String | 1 min | Map cluster cache |
 | `cache:user:{id}` | String | 5 min | User profile cache |
+| `extapi:youtube:{videoId}` | String | 24 hours | YouTube video metadata |
+| `extapi:geocode:{hash}` | String | 30 days | Geocoding result (address → coordinates) |
+| `extapi:reverse:{lat}:{lng}` | String | 30 days | Reverse geocoding (coordinates → address) |
+
+### External API Cache Structures
+
+Caching external API responses reduces costs and improves latency.
+
+**YouTube Metadata Cache**
+```
+Key: extapi:youtube:dQw4w9WgXcQ
+Value: {
+  "title": "Video Title",
+  "description": "Video description...",
+  "channelTitle": "Channel Name",
+  "thumbnailUrl": "https://img.youtube.com/...",
+  "duration": "PT4M20S",
+  "fetchedAt": "2025-01-31T12:00:00Z"
+}
+TTL: 86400 (24 hours)
+```
+
+**Geocoding Cache**
+```
+Key: extapi:geocode:a1b2c3d4  (hash of normalized address string)
+Value: {
+  "input": "123 Main St, Springfield, IL",
+  "lat": 39.7817,
+  "lng": -89.6501,
+  "formattedAddress": "123 Main St, Springfield, IL 62701, USA",
+  "placeId": "ChIJ...",
+  "fetchedAt": "2025-01-31T12:00:00Z"
+}
+TTL: 2592000 (30 days)
+
+Note: Geocoding results rarely change; long TTL reduces Google Maps API costs.
+```
+
+**Reverse Geocoding Cache**
+```
+Key: extapi:reverse:39.7817:-89.6501  (rounded to 4 decimal places)
+Value: {
+  "lat": 39.7817,
+  "lng": -89.6501,
+  "formattedAddress": "123 Main St, Springfield, IL 62701, USA",
+  "placeId": "ChIJ...",
+  "fetchedAt": "2025-01-31T12:00:00Z"
+}
+TTL: 2592000 (30 days)
+```
 
 ### Rate Limiting Structure
 
