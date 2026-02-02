@@ -6,11 +6,11 @@ AccountabilityAtlas is a multi-tier web application for geo-located video curati
 
 ## Project Structure
 
-This is a multi-repo project. The top-level repo contains project-wide configuration, while each subdirectory is its own independent git repository (excluded via `.gitignore`):
+This is a multi-repo project. The top-level repo contains project-wide configuration and architecture documentation, while each service subdirectory is its own independent git repository (excluded via `.gitignore`):
 
 ```
-AccountabilityAtlas/                   # Top-level repo (config, README, CLAUDE.md)
-├── AcctAtlas-HighLevelDocumentation/  # Architecture docs (separate repo)
+AccountabilityAtlas/                   # Top-level repo (config, README, CLAUDE.md, docs/)
+├── docs/                              # Architecture documentation
 ├── AcctAtlas-api-gateway/             # Separate repo
 ├── AcctAtlas-user-service/            # Separate repo
 ├── AcctAtlas-video-service/           # Separate repo
@@ -29,14 +29,14 @@ Start here to understand the system:
 
 | Document | Purpose |
 |----------|---------|
-| [03-ArchitectureOverview.md](AcctAtlas-HighLevelDocumentation/03-ArchitectureOverview.md) | System architecture and design decisions |
-| [04-ServiceCatalog.md](AcctAtlas-HighLevelDocumentation/04-ServiceCatalog.md) | All microservices with responsibilities |
-| [05-DataArchitecture.md](AcctAtlas-HighLevelDocumentation/05-DataArchitecture.md) | PostgreSQL schemas, temporal tables, Redis, OpenSearch |
-| [06-SecurityArchitecture.md](AcctAtlas-HighLevelDocumentation/06-SecurityArchitecture.md) | Auth, authorization, security controls |
+| [03-ArchitectureOverview.md](docs/03-ArchitectureOverview.md) | System architecture and design decisions |
+| [04-ServiceCatalog.md](docs/04-ServiceCatalog.md) | All microservices with responsibilities |
+| [05-DataArchitecture.md](docs/05-DataArchitecture.md) | PostgreSQL schemas, temporal tables, Redis, OpenSearch |
+| [06-SecurityArchitecture.md](docs/06-SecurityArchitecture.md) | Auth, authorization, security controls |
 
 ### Coding Standards
 
-See [08-DevelopmentStandards.md](AcctAtlas-HighLevelDocumentation/08-DevelopmentStandards.md) for:
+See [08-DevelopmentStandards.md](docs/08-DevelopmentStandards.md) for:
 
 - **Technology stack**: Java 21, Spring Boot 3.2.x, Gradle 9.x
 - **Code style**: Google Java Style Guide, enforced by Spotless
@@ -84,13 +84,13 @@ Each service has a `docs/technical.md` with:
 
 - **Temporal tables**: Most tables use `sys_period tstzrange` for automatic history tracking
 - **Stats tables**: Counters are in separate non-temporal tables (`user_stats`, `location_stats`)
-- See [05-DataArchitecture.md](AcctAtlas-HighLevelDocumentation/05-DataArchitecture.md) for full schema
+- See [05-DataArchitecture.md](docs/05-DataArchitecture.md) for full schema
 
 ## When Making Changes
 
-1. Changes to high-level architecture go in `AcctAtlas-HighLevelDocumentation/`
+1. Changes to high-level architecture go in `docs/`
 2. Service-specific changes go in that service's repo
-3. Each repo must be committed/pushed separately
+3. Service repos must be committed/pushed separately from the top-level repo
 4. Keep domain models in sync between high-level docs and service docs
 
 ## Delegating Work to Subagents
