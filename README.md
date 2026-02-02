@@ -6,7 +6,7 @@ A multi-tier web application for geo-located video curation focused on constitut
 
 ```
 AccountabilityAtlas/
-├── AcctAtlas-HighLevelDocumentation/  # Architecture and design documentation
+├── docs/                              # Architecture and design documentation
 ├── AcctAtlas-api-gateway/             # API Gateway service
 ├── AcctAtlas-user-service/            # User management and authentication
 ├── AcctAtlas-video-service/           # Video metadata and management
@@ -26,11 +26,11 @@ AccountabilityAtlas/
 
 ## Documentation
 
-See [AcctAtlas-HighLevelDocumentation/](AcctAtlas-HighLevelDocumentation/) for complete architecture and design documentation.
+See [docs/](docs/) for complete architecture and design documentation.
 
 ## Git and GitHub
 
-This is a multi-repo project. The top-level AccountabilityAtlas repo contains project-wide configuration (README, CLAUDE.md for Claude Code context). Each subdirectory is its own independent git repository, excluded from the top-level repo via `.gitignore`. All repos are hosted on GitHub and must be committed/pushed separately.
+This is a multi-repo project. The top-level AccountabilityAtlas repo contains project-wide configuration (README, CLAUDE.md for Claude Code context) and architecture documentation (in `docs/`). Each service subdirectory is its own independent git repository, excluded from the top-level repo via `.gitignore`. Service repos are hosted on GitHub and must be committed/pushed separately.
 
 ## The Claude Code Prompt That Started It All
 
