@@ -1,0 +1,36 @@
+# Subprojects (separate git repos)
+AcctAtlas-*/
+
+# OS files
+nul
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Claude Code local config
+.claude/
+
+# Build outputs
+build/
+dist/
+target/
+out/
+.gradle/
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Test coverage
+coverage/
+.nyc_output/
