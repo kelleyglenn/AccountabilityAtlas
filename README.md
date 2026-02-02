@@ -30,8 +30,7 @@ See [AcctAtlas-HighLevelDocumentation/](AcctAtlas-HighLevelDocumentation/) for c
 
 ## Git and GitHub
 
-All subprojects are individual git repositories managed at GitHub. The top-level AccountabilityAtlas folder is NOT a git repository and exists only locally to tie the others together and create a super-project.
----
+This is a multi-repo project. The top-level AccountabilityAtlas repo contains project-wide configuration (README, CLAUDE.md for Claude Code context). Each subdirectory is its own independent git repository, excluded from the top-level repo via `.gitignore`. All repos are hosted on GitHub and must be committed/pushed separately.
 
 ## The Claude Code Prompt That Started It All
 

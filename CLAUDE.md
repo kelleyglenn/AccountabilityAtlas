@@ -6,19 +6,19 @@ AccountabilityAtlas is a multi-tier web application for geo-located video curati
 
 ## Project Structure
 
-This is a multi-repo project. Each subdirectory is its own git repository:
+This is a multi-repo project. The top-level repo contains project-wide configuration, while each subdirectory is its own independent git repository (excluded via `.gitignore`):
 
 ```
-AccountabilityAtlas/           # NOT a git repo (local super-project only)
-├── AcctAtlas-HighLevelDocumentation/  # Architecture docs
-├── AcctAtlas-api-gateway/
-├── AcctAtlas-user-service/
-├── AcctAtlas-video-service/
-├── AcctAtlas-location-service/
-├── AcctAtlas-search-service/
-├── AcctAtlas-moderation-service/
-├── AcctAtlas-notification-service/
-└── AcctAtlas-web-app/
+AccountabilityAtlas/                   # Top-level repo (config, README, CLAUDE.md)
+├── AcctAtlas-HighLevelDocumentation/  # Architecture docs (separate repo)
+├── AcctAtlas-api-gateway/             # Separate repo
+├── AcctAtlas-user-service/            # Separate repo
+├── AcctAtlas-video-service/           # Separate repo
+├── AcctAtlas-location-service/        # Separate repo
+├── AcctAtlas-search-service/          # Separate repo
+├── AcctAtlas-moderation-service/      # Separate repo
+├── AcctAtlas-notification-service/    # Separate repo
+└── AcctAtlas-web-app/                 # Separate repo
 ```
 
 ## Key Documentation
