@@ -7,7 +7,7 @@
 | Component | Technology | Version |
 |-----------|------------|---------|
 | Language | Java | 21 LTS |
-| Framework | Spring Boot | 3.2.x |
+| Framework | Spring Boot | 3.4.x |
 | Build Tool | Gradle | 9.x |
 | JDK | Amazon Corretto | 21 LTS |
 | Container | Docker | 24.x |
@@ -597,7 +597,8 @@ We use [GitHub Flow](https://docs.github.com/en/get-started/using-github/github-
 main (protected)
 ├── Always deployable
 ├── Requires PR approval
-└── Auto-deploys to staging, manual promotion to production
+└── Phase 1-2: deploys to production (no staging env)
+    Phase 3+: auto-deploys to staging, manual promotion to production
 
 feature/AA-123-add-video-search
 ├── Created from main
@@ -611,7 +612,7 @@ feature/AA-123-add-video-search
 2. Make changes and commit with conventional commit messages
 3. Open a pull request to `main`
 4. After review and approval, merge to `main`
-5. Changes auto-deploy to staging; promote to production after verification
+5. Phase 1-2: Changes deploy to production. Phase 3+: Changes auto-deploy to staging; promote to production after verification
 
 ### Commit Messages
 

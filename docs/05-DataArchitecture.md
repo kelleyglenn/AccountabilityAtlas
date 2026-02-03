@@ -11,7 +11,7 @@ AccountabilityAtlas uses a polyglot persistence strategy with three primary data
 | Primary Database | PostgreSQL 15 + PostGIS | Transactional data, spatial queries | All services | All |
 | Full-Text Search | PostgreSQL FTS (`tsvector`/GIN) | Search, faceting, autocomplete | search-service | 1-2 |
 | Search Index | OpenSearch 2.x | Full-text search, faceting, fuzzy matching | search-service | 3+ |
-| Cache | Redis 7.x (container Phase 1, ElastiCache Phase 2+) | Sessions, caching, rate limiting | api-gateway, user-service, location-service | All |
+| Cache | Redis 7.x (container Phase 1, ElastiCache Phase 2+) | Sessions, caching, rate limiting | api-gateway, user-service, video-service, location-service | All |
 | Message Queue | Amazon SQS | Async events, decoupling | All services | All |
 
 ---
@@ -160,7 +160,7 @@ CREATE TABLE users.sessions (
 CREATE INDEX idx_sessions_user ON users.sessions(user_id);
 CREATE INDEX idx_sessions_expires ON users.sessions(expires_at);
 
--- Password reset tokens (NON-TEMPORAL - transient, expires in 24 hours)
+-- Password reset tokens (NON-TEMPORAL - transient, expires in 1 hour)
 CREATE TABLE users.password_resets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users.users(id) ON DELETE CASCADE,
@@ -796,6 +796,6 @@ Limits by trust tier:
 | Videos | Indefinite | Core content |
 | Temporal history tables | 2 years | Audit compliance, debugging |
 | Sessions | 7 days after expiry | Security cleanup |
-| Password resets | 24 hours after use/expiry | Security |
+| Password resets | 1 hour after use/expiry | Security |
 | Moderation audit log | 2 years | Compliance |
 | Notification delivery log | 90 days | Debugging |

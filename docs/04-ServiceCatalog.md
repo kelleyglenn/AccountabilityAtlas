@@ -60,7 +60,7 @@ Manages user identity, authentication, authorization, and trust tiers.
 ### Technology Stack
 | Component | Technology |
 |-----------|------------|
-| Framework | Spring Boot 3.x |
+| Framework | Spring Boot 3.4.x |
 | Language | Java 21 |
 | Build Tool | Gradle 9.x |
 | Database | PostgreSQL |
@@ -127,10 +127,11 @@ Core content service managing video records, metadata, and associations.
 ### Technology Stack
 | Component | Technology |
 |-----------|------------|
-| Framework | Spring Boot 3.x |
+| Framework | Spring Boot 3.4.x |
 | Language | Java 21 |
 | Build Tool | Gradle 9.x |
 | Database | PostgreSQL |
+| Cache | Redis |
 
 ### Responsibilities
 - Video record CRUD
@@ -211,7 +212,7 @@ Manages geospatial data, provides spatial queries, and handles map clustering.
 ### Technology Stack
 | Component | Technology |
 |-----------|------------|
-| Framework | Spring Boot 3.x |
+| Framework | Spring Boot 3.4.x |
 | Language | Java 21 |
 | Build Tool | Gradle 9.x |
 | Database | PostgreSQL + PostGIS |
@@ -258,9 +259,12 @@ Location
 ├── city: String
 ├── state: String
 ├── country: String
-├── videoCount: Integer (denormalized)
 ├── createdAt: Timestamp
 └── updatedAt: Timestamp
+
+LocationStats (separate table — counters change frequently, not temporal)
+├── locationId: UUID
+└── videoCount: Integer
 ```
 
 ### Clustering Algorithm
@@ -283,7 +287,7 @@ Provides full-text and faceted search across video content. Uses a pluggable sea
 ### Technology Stack
 | Component | Technology |
 |-----------|------------|
-| Framework | Spring Boot 3.x |
+| Framework | Spring Boot 3.4.x |
 | Language | Java 21 |
 | Build Tool | Gradle 9.x |
 | Search Engine | PostgreSQL FTS (Phase 1-2), OpenSearch (Phase 3+) |
@@ -379,7 +383,7 @@ Manages content moderation workflow and user trust progression.
 ### Technology Stack
 | Component | Technology |
 |-----------|------------|
-| Framework | Spring Boot 3.x |
+| Framework | Spring Boot 3.4.x |
 | Language | Java 21 |
 | Build Tool | Gradle 9.x |
 | Database | PostgreSQL |
@@ -464,7 +468,7 @@ Handles all user-facing communications via email.
 ### Technology Stack
 | Component | Technology |
 |-----------|------------|
-| Framework | Spring Boot 3.x |
+| Framework | Spring Boot 3.4.x |
 | Language | Java 21 |
 | Build Tool | Gradle 9.x |
 | Database | PostgreSQL |

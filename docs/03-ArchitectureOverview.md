@@ -208,8 +208,10 @@ Used for decoupled, non-blocking operations:
 |-------|------|----------|---------|--------|------------------|
 | 1 | Launch | $150-200 | EC2 t3.xlarge + Docker Compose | PostgreSQL FTS | CPU >70%, >200 concurrent users |
 | 2 | Growth | $500-800 | ECS Fargate (1 task/svc) + ALB | PostgreSQL FTS | >1,000 users, search P95 >500ms |
-| 3 | Scale | $1,500-2,000 | ECS Fargate (2 tasks/svc, HA) + Staging env | OpenSearch | >5,000 users, compliance needs |
-| 4 | Full Prod | $2,000-2,500 | ECS auto-scaling + DR | OpenSearch cluster | Current doc target state |
+| 3 | Scale | $2,300-2,900* | ECS Fargate (2 tasks/svc, HA) + Staging env | OpenSearch | >5,000 users, compliance needs |
+| 4 | Full Prod | $2,400-2,900* | ECS auto-scaling + DR | OpenSearch cluster | Current doc target state |
+
+*Phases 3-4 include a staging environment (~$570/mo). See [09-CostEstimate.md](../docs/09-CostEstimate.md) for detailed breakdowns.
 
 **Trade-offs**:
 - Phase 1 has a single point of failure (one EC2 instance) — acceptable for launch-stage traffic

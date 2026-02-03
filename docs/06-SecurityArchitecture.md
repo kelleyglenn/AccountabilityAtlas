@@ -84,26 +84,28 @@ OAuth flow uses PKCE (Proof Key for Code Exchange) for additional security.
 ### Role-Based Access Control (RBAC)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        PERMISSION MATRIX                         │
-├───────────────────┬───────┬────────┬────────────┬───────────────┤
-│ Action            │ Guest │ User   │ Moderator  │ Admin         │
-├───────────────────┼───────┼────────┼────────────┼───────────────┤
-│ View videos       │ ✓     │ ✓      │ ✓          │ ✓             │
-│ View map          │ ✓     │ ✓      │ ✓          │ ✓             │
-│ Search            │ ✓     │ ✓      │ ✓          │ ✓             │
-│ Submit video      │ ✗     │ ✓      │ ✓          │ ✓             │
-│ Edit own video    │ ✗     │ ✓      │ ✓          │ ✓             │
-│ Delete own video  │ ✗     │ ✓      │ ✓          │ ✓             │
-│ Report content    │ ✗     │ ✓      │ ✓          │ ✓             │
-│ View mod queue    │ ✗     │ ✗      │ ✓          │ ✓             │
-│ Approve/reject    │ ✗     │ ✗      │ ✓          │ ✓             │
-│ Edit any video    │ ✗     │ ✗      │ ✓          │ ✓             │
-│ Delete any video  │ ✗     │ ✗      │ ✓          │ ✓             │
-│ Manage users      │ ✗     │ ✗      │ ✗          │ ✓             │
-│ Promote to mod    │ ✗     │ ✗      │ ✗          │ ✓             │
-│ System config     │ ✗     │ ✗      │ ✗          │ ✓             │
-└───────────────────┴───────┴────────┴────────────┴───────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                             PERMISSION MATRIX                                 │
+├───────────────────┬───────┬──────────┬──────────┬────────────┬───────────────┤
+│ Action            │ Guest │ New      │ Trusted  │ Moderator  │ Admin         │
+├───────────────────┼───────┼──────────┼──────────┼────────────┼───────────────┤
+│ View videos       │ ✓     │ ✓        │ ✓        │ ✓          │ ✓             │
+│ View map          │ ✓     │ ✓        │ ✓        │ ✓          │ ✓             │
+│ Search            │ ✓     │ ✓        │ ✓        │ ✓          │ ✓             │
+│ Submit video *    │ ✗     │ ✓        │ ✓        │ ✓          │ ✓             │
+│ Edit own video    │ ✗     │ ✓        │ ✓        │ ✓          │ ✓             │
+│ Delete own video  │ ✗     │ ✓        │ ✓        │ ✓          │ ✓             │
+│ Report content    │ ✗     │ ✓        │ ✓        │ ✓          │ ✓             │
+│ View mod queue    │ ✗     │ ✗        │ ✗        │ ✓          │ ✓             │
+│ Approve/reject    │ ✗     │ ✗        │ ✗        │ ✓          │ ✓             │
+│ Edit any video    │ ✗     │ ✗        │ ✗        │ ✓          │ ✓             │
+│ Delete any video  │ ✗     │ ✗        │ ✗        │ ✓          │ ✓             │
+│ Manage users      │ ✗     │ ✗        │ ✗        │ ✗          │ ✓             │
+│ Promote to mod    │ ✗     │ ✗        │ ✗        │ ✗          │ ✓             │
+│ System config     │ ✗     │ ✗        │ ✗        │ ✗          │ ✓             │
+└───────────────────┴───────┴──────────┴──────────┴────────────┴───────────────┘
+
+* New user submissions require moderation approval. Trusted users publish directly.
 ```
 
 ### Trust Tiers
@@ -172,7 +174,9 @@ Validate video exists via YouTube Data API before accepting.
 
 ## Infrastructure Security
 
-### Network Architecture
+> **Note**: The network architecture, security groups, and WAF rules below describe the **Phase 3-4 target state**. Phase 1 uses a simplified setup (EC2 in a public subnet with nginx rate limiting). Phase 2 introduces ALB and private subnets. See [07-InfrastructureArchitecture.md](07-InfrastructureArchitecture.md) for the current phase and migration path.
+
+### Network Architecture (Phase 3-4)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -222,7 +226,7 @@ Validate video exists via YouTube Data API before accepting.
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Security Groups
+### Security Groups (Phase 3-4)
 
 | Component | Inbound | Outbound |
 |-----------|---------|----------|
@@ -232,7 +236,7 @@ Validate video exists via YouTube Data API before accepting.
 | Redis | 6379 from ECS SG | None |
 | OpenSearch | 443 from ECS SG | None |
 
-### AWS WAF Rules
+### AWS WAF Rules (Phase 3+)
 
 1. **Rate Limiting**: Block IPs exceeding 2000 requests/5 minutes
 2. **SQL Injection**: AWS managed SQLi rule set
@@ -290,13 +294,15 @@ Validate video exists via YouTube Data API before accepting.
 
 ### Alerting
 
-| Alert | Threshold | Channel |
-|-------|-----------|---------|
-| Failed logins spike | > 100/minute | PagerDuty |
-| Rate limit triggers spike | > 500/minute | Slack |
-| WAF blocks spike | > 1000/hour | Slack |
-| Authentication errors | > 10/minute | Slack |
-| Database auth failures | Any | PagerDuty |
+Alerting channels scale with deployment phase. Phases 1-2 use email-based CloudWatch alarms. Phase 3+ adds SMS for critical alerts. PagerDuty and Slack are recommended when the team and user base grow significantly (see [07-InfrastructureArchitecture.md](07-InfrastructureArchitecture.md#monitoring-and-observability)).
+
+| Alert | Threshold | Phase 1-2 Channel | Phase 3+ Channel |
+|-------|-----------|-------------------|-------------------|
+| Failed logins spike | > 100/minute | Email | PagerDuty |
+| Rate limit triggers spike | > 500/minute | Email | Slack |
+| WAF blocks spike | > 1000/hour | N/A (no WAF) | Slack |
+| Authentication errors | > 10/minute | Email | Slack |
+| Database auth failures | Any | Email | PagerDuty |
 
 ---
 

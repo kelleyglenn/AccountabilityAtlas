@@ -12,9 +12,9 @@ This document provides monthly cost estimates for AccountabilityAtlas infrastruc
 
 | Phase | Name | Monthly Cost | Notes |
 |-------|------|-------------|-------|
-| **1** | **Launch (Current)** | **~$162** | **EC2 + RDS free tier (~$177 after yr 1)** |
+| **1** | **Launch (Current)** | **~$162** | **EC2 + RDS free tier (~$179 after yr 1)** |
 | 2 | Growth | ~$525 | ECS Fargate + ALB + ElastiCache |
-| 3 | Scale | ~$1,572 (+ ~$570 staging) | OpenSearch + WAF + Multi-AZ |
+| 3 | Scale | ~$2,335 (+ ~$570 staging) | OpenSearch + WAF + Multi-AZ |
 | 4 | Full Prod | ~$2,370 (+ ~$570 staging) | Auto-scaling + DR (~$1,825 with RI) |
 | — | External APIs | ~$25 | Google Maps (all phases) |
 
@@ -52,13 +52,13 @@ This document provides monthly cost estimates for AccountabilityAtlas infrastruc
 | Service | Monthly Cost |
 |---------|--------------|
 | Route 53 (1 hosted zone + queries) | $0.50 |
-| Secrets Manager (4 secrets) | $1.60 |
+| Secrets Manager (6 secrets) | $2.40 |
 | ECR (5 GB images) | $0.50 |
 | CloudWatch Logs (5 GB) | $2.50 |
 | CloudWatch Alarms (6) | $0.60 |
 | S3 (5 GB backups) | $0.12 |
 | Elastic IP | $3.65 |
-| **Subtotal** | **~$9.47** |
+| **Subtotal** | **~$10.27** |
 
 ### Phase 1 Total
 
@@ -67,9 +67,9 @@ This document provides monthly cost estimates for AccountabilityAtlas infrastruc
 | Compute (EC2) | $122.64 | $122.64 |
 | Database (RDS) | $1.40 | $16.11 |
 | Messaging (SQS) | $0.20 | $0.20 |
-| Other Services | $9.47 | $9.47 |
-| **Total** | **~$134** | **~$148** |
-| **Total + 20% buffer** | **~$162** | **~$177** |
+| Other Services | $10.27 | $10.27 |
+| **Total** | **~$135** | **~$149** |
+| **Total + 20% buffer** | **~$162** | **~$179** |
 
 **Not included in Phase 1** (deferred to later phases): ALB, NAT Gateway, ElastiCache, OpenSearch, CloudFront, WAF, X-Ray, CodePipeline, CodeBuild. Redis runs as a Docker container on the EC2 instance at no additional cost.
 
@@ -149,6 +149,8 @@ Triggered when PostgreSQL FTS or single-task ECS becomes a bottleneck. See [07-I
 | Security (WAF) | $21 |
 | Other Services (incl. X-Ray) | $66 |
 | **Subtotal** | **$1,946** |
+| **Buffer (20%)** | **$389** |
+| **Total** | **~$2,335** |
 
 > **Note**: Production compute at 2 tasks/svc is lower than Phase 4's auto-scaling baseline. Exact costs depend on traffic patterns.
 
@@ -172,9 +174,9 @@ At this user scale, changes should be validated before production. Staging is in
 
 | Environment | Monthly Cost |
 |-------------|--------------|
-| Production (with buffer) | ~$1,572 |
+| Production (with buffer) | ~$2,335 |
 | Staging (with buffer) | ~$570 |
-| **Total** | **~$2,142** |
+| **Total** | **~$2,905** |
 
 ---
 
@@ -215,10 +217,10 @@ Unchanged from Phase 3: **~$570/month**
 
 | Phase | Monthly | Annual | Notes |
 |-------|---------|--------|-------|
-| Phase 1 (Year 1) | ~$162 | ~$1,944 | RDS free tier |
-| Phase 1 (After Year 1) | ~$177 | ~$2,124 | RDS on-demand |
-| Phase 2 | ~$550 | ~$6,600 | Incl. external APIs |
-| Phase 3 | ~$2,167 | ~$26,004 | Prod + staging + APIs |
+| Phase 1 (Year 1) | ~$187 | ~$2,244 | Incl. ~$25 external APIs |
+| Phase 1 (After Year 1) | ~$204 | ~$2,448 | Incl. ~$25 external APIs |
+| Phase 2 | ~$550 | ~$6,600 | Incl. ~$25 external APIs |
+| Phase 3 | ~$2,930 | ~$35,160 | Prod + staging + APIs |
 | Phase 4 (On-Demand) | ~$2,965 | ~$35,580 | Prod + staging + APIs |
 | Phase 4 (Reserved) | ~$2,420 | ~$29,040 | Prod + staging + APIs |
 

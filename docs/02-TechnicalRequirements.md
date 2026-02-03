@@ -100,7 +100,7 @@ Security controls scale with deployment phase:
 | Layer | Technology | Rationale |
 |-------|------------|-----------|
 | Backend Language | Java 21 LTS (Amazon Corretto) | Team expertise, JVM ecosystem |
-| Backend Framework | Spring Boot 3.2.x | Production-ready, extensive ecosystem |
+| Backend Framework | Spring Boot 3.4.x | Production-ready, extensive ecosystem |
 | API Protocol | REST + OpenAPI 3.0 | Industry standard, tooling support |
 | Primary Database | PostgreSQL 15 with PostGIS | Relational + spatial queries |
 | Search Engine | PostgreSQL FTS (Phase 1-2), OpenSearch 2.x (Phase 3+) | Full-text + faceted search |
@@ -125,7 +125,7 @@ Security controls scale with deployment phase:
 |---------|---------|------------------|
 | Google Maps Platform | Map display, geocoding | JavaScript SDK, REST API |
 | YouTube Data API | Video metadata, thumbnails, validation | REST API |
-| SendGrid/SES | Transactional email | REST API |
+| Amazon SES | Transactional email | REST API |
 | OAuth Providers | Google, Apple login | OAuth 2.0/OIDC |
 
 ### External API Integration Patterns

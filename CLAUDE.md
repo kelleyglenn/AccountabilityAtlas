@@ -38,7 +38,7 @@ Start here to understand the system:
 
 See [08-DevelopmentStandards.md](docs/08-DevelopmentStandards.md) for:
 
-- **Technology stack**: Java 21, Spring Boot 3.2.x, Gradle 9.x
+- **Technology stack**: Java 21, Spring Boot 3.4.x, Gradle 9.x
 - **Code style**: Google Java Style Guide, enforced by Spotless
 - **Static analysis**: Error Prone, SonarLint
 - **Testing**: JUnit 5, Mockito, TestContainers (80% coverage target)

@@ -29,6 +29,8 @@
 4. **Immediate notification**: Email or SMS when a new video is approved with less delay (hourly job?). Pro users only.
 5. **Promotions**: Notify users when they are promoted and celebrate!
 6. **Upsell**: Gently notify promoted users they can go Pro.
+7. **Unsubscribe**: Allow users to unsubscribe from all future messages. Linked in all messages sent.
+8. **Bounce Handling**: What do we do when we can't deliver emails to someone? Message at their next login?
 
 ## Import
 

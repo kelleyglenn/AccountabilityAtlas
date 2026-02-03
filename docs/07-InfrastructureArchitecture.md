@@ -17,8 +17,10 @@ Infrastructure scales incrementally across 4 phases. Each phase is triggered by 
 |-------|------|----------|---------|--------|---------------|
 | **1** | **Launch** | **$150-200** | **EC2 t3.xlarge + Docker Compose** | **PostgreSQL FTS** | **RDS, SQS, CloudWatch** |
 | 2 | Growth | $500-800 | ECS Fargate (1 task/svc) + ALB | PostgreSQL FTS | ALB, NAT Gateway, private subnets |
-| 3 | Scale | $1,500-2,000 | ECS Fargate (2 tasks/svc, HA) + Staging | OpenSearch | OpenSearch, WAF, X-Ray, Multi-AZ, staging env |
-| 4 | Full Prod | $2,000-2,500 | ECS auto-scaling + DR | OpenSearch cluster | Cross-region DR, reserved instances, blue-green canary |
+| 3 | Scale | $2,300-2,900* | ECS Fargate (2 tasks/svc, HA) + Staging | OpenSearch | OpenSearch, WAF, X-Ray, Multi-AZ, staging env |
+| 4 | Full Prod | $2,400-2,900* | ECS auto-scaling + DR | OpenSearch cluster | Cross-region DR, reserved instances, blue-green canary |
+
+*Phases 3-4 include a staging environment (~$570/mo). See [09-CostEstimate.md](09-CostEstimate.md) for detailed breakdowns.
 
 See [ADR-006: Phased Deployment Strategy](03-ArchitectureOverview.md#adr-006-phased-deployment-strategy) for rationale.
 
