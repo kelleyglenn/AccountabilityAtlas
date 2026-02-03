@@ -180,6 +180,12 @@ Used for decoupled, non-blocking operations:
 
 **Addendum**: ECS Fargate is deferred to Phase 2. Phase 1 uses Docker Compose on a single EC2 instance. See [ADR-006](#adr-006-phased-deployment-strategy).
 
+**EKS migration is not part of the current phase plan.** ECS Fargate comfortably handles the scale described through Phase 4. Reopen this decision if:
+- Service count exceeds 15+
+- Multiple independent teams need isolated deployment pipelines
+- Requirements emerge for service mesh or advanced traffic routing (canary deploys, traffic splitting)
+- Multi-cloud or hybrid deployment becomes a requirement
+
 ### ADR-005: YouTube Link-Only Model
 **Decision**: Store YouTube links, not video content
 **Rationale**:
