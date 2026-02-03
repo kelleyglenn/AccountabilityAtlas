@@ -3,38 +3,636 @@
 ## Cloud Platform
 
 **Primary Region**: us-east-1 (N. Virginia)
-**DR Region**: us-west-2 (Oregon)
+**DR Region**: us-west-2 (Oregon) — Phase 4
 **Cloud Provider**: Amazon Web Services (AWS)
+**Current Phase**: 1 (Launch)
 
 ---
 
-## AWS Service Inventory
+## Deployment Phases Overview
 
-| Service | Purpose | Environment |
-|---------|---------|-------------|
-| ECS Fargate | Container orchestration | Staging, Prod |
-| ALB | Load balancing | Staging, Prod |
-| RDS PostgreSQL | Primary database | Staging, Prod |
-| ElastiCache Redis | Caching, sessions | Staging, Prod |
-| OpenSearch Service | Full-text search | Staging, Prod |
-| SQS | Message queuing | Staging, Prod |
-| S3 | Static assets, backups | All |
-| CloudFront | CDN | Prod |
-| Route 53 | DNS | All |
-| ACM | SSL/TLS certificates | All |
-| Secrets Manager | Secrets storage | All |
-| CloudWatch | Logging, monitoring | All |
-| X-Ray | Distributed tracing | Staging, Prod |
-| WAF | Web application firewall | Prod |
-| ECR | Container registry | All |
-| CodePipeline | CI/CD | All |
-| CodeBuild | Build service | All |
+Infrastructure scales incrementally across 4 phases. Each phase is triggered by measurable thresholds, not calendar dates.
+
+| Phase | Name | ~Cost/mo | Compute | Search | Key Additions |
+|-------|------|----------|---------|--------|---------------|
+| **1** | **Launch** | **$150-200** | **EC2 t3.xlarge + Docker Compose** | **PostgreSQL FTS** | **RDS, SQS, CloudWatch** |
+| 2 | Growth | $500-800 | ECS Fargate (1 task/svc) + ALB | PostgreSQL FTS | ALB, NAT Gateway, private subnets |
+| 3 | Scale | $1,500-2,000 | ECS Fargate (2 tasks/svc, HA) + Staging | OpenSearch | OpenSearch, WAF, X-Ray, Multi-AZ, staging env |
+| 4 | Full Prod | $2,000-2,500 | ECS auto-scaling + DR | OpenSearch cluster | Cross-region DR, reserved instances, blue-green canary |
+
+See [ADR-006: Phased Deployment Strategy](03-ArchitectureOverview.md#adr-006-phased-deployment-strategy) for rationale.
 
 ---
 
-## Environment Topology
+## Phase 1 — Current Deployment (Launch)
+
+### AWS Service Inventory (Phase 1)
+
+| Service | Purpose |
+|---------|---------|
+| EC2 (t3.xlarge) | Docker host for all containers |
+| RDS PostgreSQL | Primary database |
+| SQS | Message queuing |
+| S3 | Backups, static assets |
+| Route 53 | DNS |
+| ECR | Container registry |
+| CloudWatch | Logging, monitoring |
+| Secrets Manager | Secrets storage |
+
+### Environment Topology
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                       PRODUCTION (us-east-1)                                  │
+│                                                                               │
+│  ┌──────────────────────────────────────────────────────────────────────┐    │
+│  │                    EC2 t3.xlarge (4 vCPU, 16 GB)                     │    │
+│  │                                                                       │    │
+│  │  ┌─────────────────────────────────────────────────────────────┐     │    │
+│  │  │                     Docker Compose                           │     │    │
+│  │  │                                                              │     │    │
+│  │  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐          │     │    │
+│  │  │  │  nginx   │ │api-gw   │ │user-svc │ │video-svc│          │     │    │
+│  │  │  │ :80/:443│ │  :8080  │ │  :8081  │ │  :8082  │          │     │    │
+│  │  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘          │     │    │
+│  │  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐          │     │    │
+│  │  │  │location │ │ search  │ │mod-svc  │ │notif-svc│          │     │    │
+│  │  │  │  :8083  │ │  :8084  │ │  :8085  │ │  :8086  │          │     │    │
+│  │  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘          │     │    │
+│  │  │  ┌─────────┐ ┌─────────┐                                   │     │    │
+│  │  │  │ web-app │ │  redis  │                                   │     │    │
+│  │  │  │  :3000  │ │  :6379  │                                   │     │    │
+│  │  │  └─────────┘ └─────────┘                                   │     │    │
+│  │  └─────────────────────────────────────────────────────────────┘     │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+│                              │                                                │
+│                              ▼                                                │
+│  ┌────────────────┐    ┌──────────┐    ┌──────────┐                          │
+│  │  RDS PostgreSQL│    │   SQS    │    │    S3    │                          │
+│  │ db.t4g.micro   │    │  Queues  │    │ Backups  │                          │
+│  │ (2 vCPU, 1 GB) │    └──────────┘    └──────────┘                          │
+│  └────────────────┘                                                           │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Docker Compose Configuration
+
+```yaml
+# docker-compose.prod.yml
+version: "3.8"
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/letsencrypt:ro
+    depends_on:
+      - api-gateway
+      - web-app
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+    restart: always
+
+  api-gateway:
+    image: ${ECR_REGISTRY}/acct-atlas-api-gateway:${TAG}
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: always
+
+  user-service:
+    image: ${ECR_REGISTRY}/acct-atlas-user-service:${TAG}
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: always
+
+  video-service:
+    image: ${ECR_REGISTRY}/acct-atlas-video-service:${TAG}
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: always
+
+  location-service:
+    image: ${ECR_REGISTRY}/acct-atlas-location-service:${TAG}
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: always
+
+  search-service:
+    image: ${ECR_REGISTRY}/acct-atlas-search-service:${TAG}
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod,fts
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: always
+
+  moderation-service:
+    image: ${ECR_REGISTRY}/acct-atlas-moderation-service:${TAG}
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 512M
+    restart: always
+
+  notification-service:
+    image: ${ECR_REGISTRY}/acct-atlas-notification-service:${TAG}
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 512M
+    restart: always
+
+  web-app:
+    image: ${ECR_REGISTRY}/acct-atlas-web-app:${TAG}
+    environment:
+      - NODE_ENV=production
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.15"
+          memory: 640M
+    restart: always
+
+volumes:
+  redis-data:
+```
+
+#### Resource Allocation Summary
+
+| Container | CPU Limit | Memory Limit |
+|-----------|-----------|-------------|
+| nginx | 0.25 vCPU | 256 MB |
+| api-gateway | 0.50 vCPU | 1,024 MB |
+| user-service | 0.50 vCPU | 1,024 MB |
+| video-service | 0.50 vCPU | 1,024 MB |
+| location-service | 0.50 vCPU | 1,024 MB |
+| search-service | 0.50 vCPU | 1,024 MB |
+| moderation-service | 0.25 vCPU | 512 MB |
+| notification-service | 0.25 vCPU | 512 MB |
+| web-app | 0.50 vCPU | 1,024 MB |
+| redis | 0.15 vCPU | 640 MB |
+| **Total** | **~3.90 vCPU** | **~7,040 MB** |
+
+The t3.xlarge instance (4 vCPU, 16 GB RAM) provides headroom for the OS, Docker daemon, and CloudWatch agent beyond container limits.
+
+### Nginx Reverse Proxy
+
+```nginx
+# nginx/nginx.conf
+events {
+    worker_connections 1024;
+}
+
+http {
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=general:10m rate=30r/s;
+    limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/s;
+
+    upstream api_gateway {
+        server api-gateway:8080;
+    }
+
+    upstream web_app {
+        server web-app:3000;
+    }
+
+    # Redirect HTTP to HTTPS
+    server {
+        listen 80;
+        server_name accountabilityatlas.com www.accountabilityatlas.com;
+        return 301 https://$host$request_uri;
+    }
+
+    server {
+        listen 443 ssl;
+        server_name accountabilityatlas.com www.accountabilityatlas.com;
+
+        ssl_certificate /etc/letsencrypt/live/accountabilityatlas.com/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/accountabilityatlas.com/privkey.pem;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_prefer_server_ciphers on;
+
+        # API routes
+        location /api/ {
+            limit_req zone=general burst=20 nodelay;
+            proxy_pass http://api_gateway;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Auth routes (stricter rate limiting)
+        location /api/v1/auth/ {
+            limit_req zone=auth burst=5 nodelay;
+            proxy_pass http://api_gateway;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Web application (everything else)
+        location / {
+            limit_req zone=general burst=20 nodelay;
+            proxy_pass http://web_app;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}
+```
+
+### TLS Configuration
+
+Phase 1 uses Let's Encrypt with certbot for free TLS certificates:
+
+```bash
+# Initial certificate request (run on EC2 instance)
+sudo certbot certonly --standalone -d accountabilityatlas.com -d www.accountabilityatlas.com
+
+# Auto-renewal via cron (certbot installs this automatically)
+# 0 0,12 * * * certbot renew --quiet --deploy-hook "docker compose restart nginx"
+```
+
+### Database Configuration
+
+| Setting | Phase 1 Value |
+|---------|---------------|
+| Instance | db.t4g.micro (2 vCPU, 1 GB) |
+| Storage | 20 GB gp3 |
+| Multi-AZ | No |
+| Read Replicas | 0 |
+| Backup Retention | 7 days |
+| PITR | Disabled |
+| Performance Insights | Disabled |
+| Extensions | postgis, temporal_tables |
+
+> **Note**: db.t4g.micro is included in the RDS free tier for the first 12 months. See [09-CostEstimate.md](09-CostEstimate.md) for cost implications.
+
+### Redis Configuration
+
+Phase 1 runs Redis as a Docker container (not ElastiCache) to minimize cost:
+
+| Setting | Value |
+|---------|-------|
+| Image | redis:7-alpine |
+| Max Memory | 512 MB |
+| Eviction Policy | allkeys-lru |
+| Persistence | RDB snapshots to container volume |
+| Backup | Not required (cache only — rebuilds on restart) |
+
+### Networking
+
+#### Simplified VPC (Phase 1)
+
+```
+VPC CIDR: 10.0.0.0/16
+
+Subnets:
+├── Public (EC2 instance)
+│   └── us-east-1a: 10.0.1.0/24
+└── Data (RDS)
+    └── us-east-1a: 10.0.20.0/24
+    └── us-east-1b: 10.0.21.0/24  (required for RDS subnet group)
+```
+
+No NAT Gateway, no private subnets, no ALB. The EC2 instance sits in a public subnet with a public IP. RDS sits in a data subnet accessible only from the EC2 security group.
+
+#### DNS Configuration (Route 53)
+
+| Record | Type | Value |
+|--------|------|-------|
+| accountabilityatlas.com | A | EC2 Elastic IP |
+| www.accountabilityatlas.com | CNAME | accountabilityatlas.com |
+
+### Security Groups
+
+**EC2 Security Group** (`sg-ec2-web`):
+
+| Direction | Protocol | Port | Source | Description |
+|-----------|----------|------|--------|-------------|
+| Inbound | TCP | 80 | 0.0.0.0/0 | HTTP (redirect to HTTPS) |
+| Inbound | TCP | 443 | 0.0.0.0/0 | HTTPS |
+| Inbound | TCP | 22 | Admin IP | SSH (deployment, maintenance) |
+| Outbound | All | All | 0.0.0.0/0 | Internet access |
+
+**RDS Security Group** (`sg-rds`):
+
+| Direction | Protocol | Port | Source | Description |
+|-----------|----------|------|--------|-------------|
+| Inbound | TCP | 5432 | sg-ec2-web | PostgreSQL from EC2 only |
+
+### CI/CD Pipeline
+
+Phase 1 uses GitHub Actions for CI and SSH-based deployment:
+
+```
+┌─────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+│  GitHub  │───▶│  GitHub  │───▶│   ECR    │───▶│   EC2    │
+│  (Push)  │    │ Actions  │    │ (Image)  │    │(SSH Pull)│
+└─────────┘    └──────────┘    └──────────┘    └──────────┘
+                    │
+              ┌─────┴─────┐
+              ▼           ▼
+         ┌────────┐  ┌─────────────┐
+         │ Tests  │  │ Lint/Analyze│
+         │(JUnit) │  │(Spotless,   │
+         └────────┘  │Error Prone) │
+                     └─────────────┘
+```
+
+#### GitHub Actions Workflow
+
+```yaml
+# .github/workflows/deploy.yml
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "corretto"
+      - name: Run tests and checks
+        run: ./gradlew check
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push Docker image
+        run: |
+          TAG=$(git rev-parse --short HEAD)
+          docker build -t $ECR_REGISTRY/${{ github.event.repository.name }}:$TAG .
+          docker build -t $ECR_REGISTRY/${{ github.event.repository.name }}:latest .
+          docker push $ECR_REGISTRY/${{ github.event.repository.name }}:$TAG
+          docker push $ECR_REGISTRY/${{ github.event.repository.name }}:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            cd /opt/accountabilityatlas
+            export TAG=$(git rev-parse --short HEAD)
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
+            docker image prune -f
+```
+
+### Monitoring
+
+Phase 1 uses the CloudWatch Agent on the EC2 instance for basic monitoring:
+
+#### CloudWatch Alarms
+
+| Alarm | Metric | Threshold | Action |
+|-------|--------|-----------|--------|
+| EC2 High CPU | CPUUtilization | >70% for 10 min | Email notification |
+| EC2 High Memory | mem_used_percent (CW Agent) | >80% for 10 min | Email notification |
+| EC2 Low Disk | disk_used_percent (CW Agent) | >85% | Email notification |
+| RDS High CPU | CPUUtilization | >80% for 10 min | Email notification |
+| SQS Queue Depth | ApproximateNumberOfMessages | >1,000 | Email notification |
+| EC2 Status Check | StatusCheckFailed | >0 for 5 min | EC2 auto-recover |
+
+> **Note**: The EC2 High CPU alarm at 70% also serves as a **Phase 2 migration trigger**. Sustained CPU above 70% indicates the single instance is approaching capacity.
+
+#### Application Logging
+
+All containers log to stdout/stderr. Docker's `awslogs` log driver forwards logs to CloudWatch Logs:
+
+```yaml
+# Added to each service in docker-compose.prod.yml
+logging:
+  driver: awslogs
+  options:
+    awslogs-region: us-east-1
+    awslogs-group: /accountabilityatlas/prod
+    awslogs-stream-prefix: ${SERVICE_NAME}
+```
+
+### Backup and Disaster Recovery
+
+| Resource | Backup Type | Frequency | Retention |
+|----------|-------------|-----------|-----------|
+| RDS | Automated snapshot | Daily | 7 days |
+| EC2 | Manual AMI | Before major changes | 2 most recent |
+| Docker Compose config | Git repository | Every commit | Indefinite |
+
+**Recovery procedures**:
+- **Service failure**: `docker compose up -d` restarts failed containers (automatic via `restart: always`)
+- **EC2 failure**: Launch new instance from AMI, pull latest images from ECR, start Docker Compose (~30 min RTO)
+- **Database failure**: Restore from RDS snapshot (~15 min RTO)
+- **Full recovery**: Launch EC2 from AMI + restore RDS snapshot (~30 min RTO, same AZ)
+
+### Phase 1 → Phase 2 Migration Triggers
+
+Migrate to Phase 2 (ECS Fargate) when **any** of these thresholds are sustained:
+
+| Trigger | Threshold | Measurement |
+|---------|-----------|-------------|
+| EC2 CPU utilization | >70% sustained for 1 week | CloudWatch metric |
+| Concurrent users | >200 | Application metrics |
+| Need for zero-downtime deploys | Business requirement | Manual assessment |
+| Single point of failure unacceptable | Business requirement | Manual assessment |
+
+---
+
+## Phase 2 — Growth
+
+### Migration Triggers (from Phase 1)
+See [Phase 1 → Phase 2 Migration Triggers](#phase-1--phase-2-migration-triggers) above.
+
+### Key Changes from Phase 1
+
+| Component | Phase 1 | Phase 2 |
+|-----------|---------|---------|
+| Compute | EC2 t3.xlarge + Docker Compose | ECS Fargate (1 task per service) |
+| Load Balancer | Nginx on EC2 | Application Load Balancer (ALB) |
+| Redis | Docker container | ElastiCache (cache.t3.medium) |
+| Network | Public subnet only | VPC with public/private/data subnets + NAT Gateway |
+| TLS | Let's Encrypt | ACM (ALB-terminated) |
+| Deployment | SSH pull | ECS rolling deployment |
+| Search | PostgreSQL FTS | PostgreSQL FTS (unchanged) |
+
+### AWS Services Added
+
+| Service | Purpose |
+|---------|---------|
+| ECS Fargate | Container orchestration |
+| ALB | Load balancing, health checks |
+| ElastiCache Redis | Managed cache (cache.t3.medium) |
+| NAT Gateway | Outbound internet for private subnets |
+| ACM | Managed TLS certificates |
+
+### ECS Task Definitions
+
+| Service | CPU | Memory | Port | Health Check |
+|---------|-----|--------|------|--------------|
+| api-gateway | 512 | 1024 | 8080 | /actuator/health |
+| user-service | 512 | 1024 | 8081 | /actuator/health |
+| video-service | 512 | 1024 | 8082 | /actuator/health |
+| location-service | 512 | 1024 | 8083 | /actuator/health |
+| search-service | 512 | 1024 | 8084 | /actuator/health |
+| moderation-service | 256 | 512 | 8085 | /actuator/health |
+| notification-service | 256 | 512 | 8086 | /actuator/health |
+| web-app | 512 | 1024 | 3000 | /api/health |
+
+### VPC Configuration
+
+```
+VPC CIDR: 10.0.0.0/16
+
+Subnets:
+├── Public (NAT Gateway, ALB)
+│   ├── us-east-1a: 10.0.1.0/24
+│   └── us-east-1b: 10.0.2.0/24
+├── Private (ECS Services)
+│   ├── us-east-1a: 10.0.10.0/24
+│   └── us-east-1b: 10.0.11.0/24
+└── Data (RDS, ElastiCache)
+    ├── us-east-1a: 10.0.20.0/24
+    └── us-east-1b: 10.0.21.0/24
+```
+
+### DNS Configuration (Route 53)
+
+| Record | Type | Value |
+|--------|------|-------|
+| accountabilityatlas.com | A | ALB |
+| api.accountabilityatlas.com | A | ALB |
+
+### Database Configuration
+
+| Setting | Phase 2 Value |
+|---------|---------------|
+| Instance | db.t3.medium (2 vCPU, 4 GB) |
+| Storage | 50 GB gp3 |
+| Multi-AZ | No |
+| Read Replicas | 0 |
+| Backup Retention | 7 days |
+| PITR | Enabled |
+
+### Phase 2 → Phase 3 Migration Triggers
+
+| Trigger | Threshold | Measurement |
+|---------|-----------|-------------|
+| Active registered users | >1,000 | Application metrics |
+| Search P95 latency | >500ms | CloudWatch / application metrics |
+| Need for staging environment | Business/compliance requirement | Manual assessment |
+| Need for fuzzy search / "did you mean" | Feature requirement | Manual assessment |
+
+---
+
+## Phase 3 — Scale
+
+### Migration Triggers (from Phase 2)
+See [Phase 2 → Phase 3 Migration Triggers](#phase-2--phase-3-migration-triggers) above.
+
+### Key Changes from Phase 2
+
+| Component | Phase 2 | Phase 3 |
+|-----------|---------|---------|
+| ECS tasks | 1 per service | 2 per service (HA) |
+| Search | PostgreSQL FTS | OpenSearch (t3.small.search) |
+| Database | db.t3.medium, single-AZ | db.r6g.large, Multi-AZ |
+| Redis | cache.t3.medium, single node | cache.r6g.large, 2-node cluster |
+| Security | ALB + security groups | ALB + WAF + security groups |
+| Tracing | None | AWS X-Ray |
+| Environments | Production only | **Staging + Production** |
+
+### AWS Services Added
+
+| Service | Purpose |
+|---------|---------|
+| OpenSearch Service | Full-text search (replaces PostgreSQL FTS) |
+| WAF | Web application firewall |
+| X-Ray | Distributed tracing |
+| CloudFront | CDN for static assets |
 
 ### Staging Environment
+
+At this user scale, changes should be validated before production. A staging environment is introduced:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -58,8 +656,65 @@
 │  └─────────────┘  └─────────────┘  └─────────────┘         │
 └─────────────────────────────────────────────────────────────┘
 
-Note: Instance types abbreviated for diagram. Full names: cache.t3.medium, t3.small.search
+Note: Instance types abbreviated. Full names: cache.t3.medium, t3.small.search
 ```
+
+### OpenSearch Configuration
+
+| Setting | Staging | Production |
+|---------|---------|------------|
+| Instance | t3.small.search | r6g.large.search |
+| Nodes | 1 | 3 |
+| Storage | 20 GB | 100 GB |
+| Encryption | Yes | Yes |
+| Fine-grained Access | Yes | Yes |
+
+### Database Configuration
+
+| Setting | Staging | Production |
+|---------|---------|------------|
+| Instance | db.t3.medium | db.r6g.large |
+| Storage | 50 GB | 100 GB |
+| Multi-AZ | No | Yes |
+| Read Replicas | 0 | 1 |
+| Backup Retention | 7 days | 30 days |
+| PITR | Enabled | Enabled |
+| Performance Insights | Enabled | Enabled |
+
+### ElastiCache Redis
+
+| Setting | Staging | Production |
+|---------|---------|------------|
+| Node Type | cache.t3.medium | cache.r6g.large |
+| Nodes | 1 | 2 (cluster) |
+| Multi-AZ | No | Yes |
+| Encryption at Rest | Yes | Yes |
+| Encryption in Transit | Yes | Yes |
+
+### Phase 3 → Phase 4 Migration Triggers
+
+| Trigger | Threshold | Measurement |
+|---------|-----------|-------------|
+| Active registered users | >5,000 | Application metrics |
+| Need for cross-region DR | Compliance/business requirement | Manual assessment |
+| Need for auto-scaling | Sustained traffic spikes | CloudWatch metrics |
+
+---
+
+## Phase 4 — Full Production
+
+### Migration Triggers (from Phase 3)
+See [Phase 3 → Phase 4 Migration Triggers](#phase-3--phase-4-migration-triggers) above.
+
+### Key Changes from Phase 3
+
+| Component | Phase 3 | Phase 4 |
+|-----------|---------|---------|
+| ECS scaling | Fixed 2 tasks/svc | Auto-scaling (min 2, max 10) |
+| DR | Single region | Cross-region (us-west-2) |
+| Deployment | Rolling | Blue-green with canary |
+| CI/CD | GitHub Actions → ECS | CodePipeline → CodeBuild → ECS |
+| Cost optimization | On-demand | Reserved instances |
 
 ### Production Environment
 
@@ -97,40 +752,8 @@ Note: Instance types abbreviated for diagram. Full names: cache.t3.medium, t3.sm
 │  └─────────────┘                                            │
 └─────────────────────────────────────────────────────────────┘
 
-Note: Instance types abbreviated for diagram. Full names: db.r6g.large, cache.r6g.large, r6g.large.search
+Note: Instance types abbreviated. Full names: db.r6g.large, cache.r6g.large, r6g.large.search
 ```
-
----
-
-## Container Configuration
-
-### ECS Task Definitions
-
-| Service | CPU | Memory | Port | Health Check |
-|---------|-----|--------|------|--------------|
-| api-gateway | 512 | 1024 | 8080 | /actuator/health |
-| user-service | 512 | 1024 | 8081 | /actuator/health |
-| video-service | 512 | 1024 | 8082 | /actuator/health |
-| location-service | 512 | 1024 | 8083 | /actuator/health |
-| search-service | 512 | 1024 | 8084 | /actuator/health |
-| moderation-service | 256 | 512 | 8085 | /actuator/health |
-| notification-service | 256 | 512 | 8086 | /actuator/health |
-| web-app | 512 | 1024 | 3000 | /api/health |
-
-### Web Application Hosting
-
-The Next.js web application is deployed as a containerized service on ECS Fargate, with static assets served through CloudFront.
-
-| Environment | Tasks | CloudFront | Notes |
-|-------------|-------|------------|-------|
-| Dev | 1 | No | Direct ALB access |
-| Staging | 2 | No | Direct ALB access |
-| Production | 2-5 | Yes | CloudFront CDN for static assets |
-
-**Production Architecture**:
-- CloudFront serves static assets (JS, CSS, images) from S3
-- Dynamic requests (SSR, API routes) route to ECS via ALB
-- Next.js runs in standalone output mode for container deployment
 
 ### Auto-Scaling Configuration
 
@@ -153,78 +776,21 @@ scaling_policy:
     notification-service: { min: 1, max: 5 }
 ```
 
----
+### Web Application Hosting
 
-## Database Configuration
+The Next.js web application runs as a containerized ECS service, with static assets served through CloudFront:
 
-### RDS PostgreSQL
+| Environment | Tasks | CloudFront | Notes |
+|-------------|-------|------------|-------|
+| Staging | 2 | No | Direct ALB access |
+| Production | 2-5 | Yes | CloudFront CDN for static assets |
 
-| Setting | Dev | Staging | Production |
-|---------|-----|---------|------------|
-| Instance | db.t3.small | db.t3.medium | db.r6g.large |
-| Storage | 20 GB | 50 GB | 100 GB |
-| Multi-AZ | No | No | Yes |
-| Read Replicas | 0 | 0 | 1 |
-| Backup Retention | 1 day | 7 days | 30 days |
-| PITR | Disabled | Enabled | Enabled |
-| Performance Insights | Disabled | Enabled | Enabled |
-| Extensions | postgis | postgis | postgis |
+**Production architecture**:
+- CloudFront serves static assets (JS, CSS, images) from S3
+- Dynamic requests (SSR, API routes) route to ECS via ALB
+- Next.js runs in standalone output mode for container deployment
 
-### ElastiCache Redis
-
-| Setting | Dev | Staging | Production |
-|---------|-----|---------|------------|
-| Node Type | cache.t3.small | cache.t3.medium | cache.r6g.large |
-| Nodes | 1 | 1 | 2 (cluster) |
-| Multi-AZ | No | No | Yes |
-| Encryption at Rest | Yes | Yes | Yes |
-| Encryption in Transit | Yes | Yes | Yes |
-
-### OpenSearch
-
-| Setting | Staging | Production |
-|---------|---------|------------|
-| Instance | t3.small.search | r6g.large.search |
-| Nodes | 1 | 3 |
-| Storage | 20 GB | 100 GB |
-| Encryption | Yes | Yes |
-| Fine-grained Access | Yes | Yes |
-
----
-
-## Networking
-
-### VPC Configuration
-
-```
-VPC CIDR: 10.0.0.0/16
-
-Subnets:
-├── Public (NAT Gateway, ALB)
-│   ├── us-east-1a: 10.0.1.0/24
-│   └── us-east-1b: 10.0.2.0/24
-├── Private (ECS Services)
-│   ├── us-east-1a: 10.0.10.0/24
-│   └── us-east-1b: 10.0.11.0/24
-└── Data (RDS, ElastiCache, OpenSearch)
-    ├── us-east-1a: 10.0.20.0/24
-    └── us-east-1b: 10.0.21.0/24
-```
-
-### DNS Configuration (Route 53)
-
-| Record | Type | Value |
-|--------|------|-------|
-| accountabilityatlas.com | A | CloudFront distribution |
-| api.accountabilityatlas.com | A | ALB (prod) |
-| api.staging.accountabilityatlas.com | A | ALB (staging) |
-| api.dev.accountabilityatlas.com | A | ALB (dev) |
-
----
-
-## CI/CD Pipeline
-
-### Pipeline Architecture
+### CI/CD Pipeline
 
 ```
 ┌─────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
@@ -241,14 +807,9 @@ Subnets:
                      └─────────────┘
 ```
 
-### Pipeline Stages
-
+**Pipeline stages**:
 1. **Source**: GitHub webhook on push to main
-2. **Build**:
-   - Run tests (JUnit, integration tests)
-   - Run code quality checks (Spotless formatting, Error Prone static analysis)
-   - Build Docker image
-   - Push to ECR
+2. **Build**: Tests, code quality checks, Docker image build, push to ECR
 3. **Deploy Staging**: Auto-deploy on main branch
 4. **Deploy Production**: Manual approval required
 
@@ -271,31 +832,57 @@ deployment:
         - DEPLOYMENT_STOP_ON_ALARM
 ```
 
+### DNS Configuration (Route 53)
+
+| Record | Type | Value |
+|--------|------|-------|
+| accountabilityatlas.com | A | CloudFront distribution |
+| api.accountabilityatlas.com | A | ALB (prod) |
+| api.staging.accountabilityatlas.com | A | ALB (staging) |
+
+### Disaster Recovery
+
+#### Backup Strategy
+
+| Resource | Backup Type | Frequency | Retention | Location |
+|----------|-------------|-----------|-----------|----------|
+| RDS | Automated snapshot | Daily | 30 days | Same region |
+| RDS | Cross-region snapshot | Daily | 7 days | us-west-2 |
+| OpenSearch | Automated snapshot | Hourly | 14 days | S3 |
+| S3 | Cross-region replication | Continuous | - | us-west-2 |
+
+#### Recovery Procedures
+
+| Scenario | RTO | RPO | Procedure |
+|----------|-----|-----|-----------|
+| Single service failure | 5 min | 0 | ECS auto-recovery |
+| AZ failure | 10 min | 0 | Multi-AZ failover |
+| Database failure | 15 min | 5 min | RDS failover |
+| Region failure | 4 hours | 1 hour | DR region activation |
+
+### Reserved Instances
+
+| Service | Instance | Term | Savings |
+|---------|----------|------|---------|
+| RDS | db.r6g.large | 1 year | ~40% |
+| ElastiCache | cache.r6g.large | 1 year | ~40% |
+| OpenSearch | r6g.large.search | 1 year | ~40% |
+
 ---
 
 ## Monitoring and Observability
 
-### CloudWatch Dashboards
+Monitoring capabilities scale with phase:
 
-1. **Overview Dashboard**
-   - Request count by service
-   - Error rates
-   - Latency percentiles
-   - Active tasks per service
+| Capability | Phase 1 | Phase 2 | Phase 3+ |
+|------------|---------|---------|----------|
+| Logging | CloudWatch Agent (awslogs driver) | CloudWatch Logs | CloudWatch Logs |
+| Metrics | CloudWatch Agent (CPU, memory, disk) | CloudWatch Metrics | CloudWatch Metrics + Prometheus |
+| Tracing | None | None | AWS X-Ray (5% sampling) |
+| Dashboards | None (alarms only) | 1 overview dashboard | 3 dashboards (overview, DB, search) |
+| Alerting | Basic alarms (email) | Full alarm suite (email) | Full alarms (email + SMS for critical) |
 
-2. **Database Dashboard**
-   - CPU utilization
-   - Connection count
-   - Read/write IOPS
-   - Replication lag
-
-3. **Search Dashboard**
-   - Query latency
-   - Index size
-   - Document count
-   - JVM metrics
-
-### Alarms
+### CloudWatch Alarms (Phase 3+)
 
 | Alarm | Metric | Threshold | Severity | Action |
 |-------|--------|-----------|----------|--------|
@@ -308,10 +895,10 @@ deployment:
 | Queue Depth | ApproximateNumberOfMessages | > 1000 | Warning | Email |
 
 **Scaling alerting infrastructure**: As user base grows significantly, consider upgrading to:
-- **PagerDuty** for critical alarms - adds on-call scheduling, escalation policies, and acknowledgment tracking
-- **Slack** for warning alarms - improves team visibility and enables quick collaboration on issues
+- **PagerDuty** for critical alarms — adds on-call scheduling, escalation policies, and acknowledgment tracking
+- **Slack** for warning alarms — improves team visibility and enables quick collaboration on issues
 
-### Distributed Tracing (X-Ray)
+### Distributed Tracing (Phase 3+)
 
 - All services instrumented with AWS X-Ray SDK
 - Trace sampling: 5% in production
@@ -320,39 +907,7 @@ deployment:
 
 ---
 
-## Disaster Recovery
-
-### Backup Strategy
-
-| Resource | Backup Type | Frequency | Retention | Location |
-|----------|-------------|-----------|-----------|----------|
-| RDS | Automated snapshot | Daily | 30 days | Same region |
-| RDS | Cross-region snapshot | Daily | 7 days | us-west-2 |
-| OpenSearch | Automated snapshot | Hourly | 14 days | S3 |
-| S3 | Cross-region replication | Continuous | - | us-west-2 |
-
-### Recovery Procedures
-
-| Scenario | RTO | RPO | Procedure |
-|----------|-----|-----|-----------|
-| Single service failure | 5 min | 0 | ECS auto-recovery |
-| AZ failure | 10 min | 0 | Multi-AZ failover |
-| Database failure | 15 min | 5 min | RDS failover |
-| Region failure | 4 hours | 1 hour | DR region activation |
-
----
-
-## Cost Optimization
-
-### Reserved Instances (Production)
-
-| Service | Instance | Term | Savings |
-|---------|----------|------|---------|
-| RDS | db.r6g.large | 1 year | ~40% |
-| ElastiCache | cache.r6g.large | 1 year | ~40% |
-| OpenSearch | r6g.large.search | 1 year | ~40% |
-
-### Cost Allocation Tags
+## Cost Allocation Tags
 
 All resources tagged with:
 - `Environment`: dev/staging/prod

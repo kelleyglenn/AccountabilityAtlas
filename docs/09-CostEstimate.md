@@ -1,227 +1,77 @@
 # Cost Estimate
 
-This document provides detailed monthly cost estimates for AccountabilityAtlas infrastructure based on the configurations documented in [07-InfrastructureArchitecture.md](07-InfrastructureArchitecture.md).
+This document provides monthly cost estimates for AccountabilityAtlas infrastructure across all deployment phases. Phase 1 is the current deployment.
 
 **Pricing Region**: us-east-1 (N. Virginia)
 **Pricing Date**: January 2025 (prices subject to change)
+**Current Phase**: 1 (Launch)
 
 ---
 
-## Summary by Environment
+## Summary by Phase
 
-| Environment | Monthly Cost (On-Demand) | With Reserved Instances |
-|-------------|--------------------------|-------------------------|
-| Staging | ~$570 | N/A |
-| Production | ~$2,370 | ~$1,825 |
-| External APIs (with caching) | ~$25 | ~$25 |
-| **Total** | **~$2,965** | **~$2,420** |
+| Phase | Name | Monthly Cost | Notes |
+|-------|------|-------------|-------|
+| **1** | **Launch (Current)** | **~$162** | **EC2 + RDS free tier (~$177 after yr 1)** |
+| 2 | Growth | ~$525 | ECS Fargate + ALB + ElastiCache |
+| 3 | Scale | ~$1,572 (+ ~$570 staging) | OpenSearch + WAF + Multi-AZ |
+| 4 | Full Prod | ~$2,370 (+ ~$570 staging) | Auto-scaling + DR (~$1,825 with RI) |
+| — | External APIs | ~$25 | Google Maps (all phases) |
 
-*All estimates include 20% buffer. Caching ensures external API costs remain stable as traffic grows - see [External API Costs](#external-api-costs).*
+*All phase estimates include 20% buffer except Phase 1 (exact pricing). See each phase section for detailed breakdowns.*
 
 ---
 
-## Staging Environment
+## Phase 1 Cost Breakdown (Current)
 
-### Compute (ECS Fargate)
+### Compute (EC2)
 
-| Service | Tasks | vCPU | Memory (GB) | Hours/Month | Cost |
-|---------|-------|------|-------------|-------------|------|
-| api-gateway | 2 | 0.5 | 1 | 1460 | $37.96 |
-| user-service | 2 | 0.5 | 1 | 1460 | $37.96 |
-| video-service | 2 | 0.5 | 1 | 1460 | $37.96 |
-| location-service | 2 | 0.5 | 1 | 1460 | $37.96 |
-| search-service | 2 | 0.5 | 1 | 1460 | $37.96 |
-| moderation-service | 2 | 0.25 | 0.5 | 1460 | $18.98 |
-| notification-service | 2 | 0.25 | 0.5 | 1460 | $18.98 |
-
-**Subtotal**: ~$228/month
+| Service | Instance | Pricing | Monthly Cost |
+|---------|----------|---------|--------------|
+| EC2 | t3.xlarge (4 vCPU, 16 GB) | On-Demand | $122.64 |
 
 ### Database (RDS PostgreSQL)
 
-| Setting | Value | Monthly Cost |
-|---------|-------|--------------|
-| Instance | db.t3.medium (2 vCPU, 4 GB) | $51.10 |
-| Storage | 50 GB gp3 | $5.75 |
-| Backup | 7 day retention | ~$3.50 |
-| Performance Insights | Enabled | Free (7-day retention) |
+| Setting | Value | Year 1 Cost | After Year 1 |
+|---------|-------|-------------|--------------|
+| Instance | db.t4g.micro (2 vCPU, 1 GB) | **Free** (free tier) | $12.41 |
+| Storage | 20 GB gp3 | **Free** (free tier) | $2.30 |
+| Backup | 7-day retention | ~$1.40 | ~$1.40 |
+| **Subtotal** | | **~$1.40** | **~$16.11** |
 
-**Subtotal**: ~$60/month
+> **Note**: RDS db.t4g.micro includes 750 hours/month free for the first 12 months, plus 20 GB free storage. After year 1, costs increase by ~$15/month.
 
-### Cache (ElastiCache Redis)
-
-| Setting | Value | Monthly Cost |
-|---------|-------|--------------|
-| Node Type | cache.t3.medium | $49.06 |
-| Nodes | 1 | - |
-
-**Subtotal**: ~$49/month
-
-### Search (OpenSearch)
-
-| Setting | Value | Monthly Cost |
-|---------|-------|--------------|
-| Instance | t3.small.search | $26.28 |
-| Nodes | 1 | - |
-| Storage | 20 GB | $2.54 |
-
-**Subtotal**: ~$29/month
-
-### Networking
-
-| Service | Monthly Cost |
-|---------|--------------|
-| ALB | $22.27 |
-| NAT Gateway (2 AZ) | $65.70 |
-| NAT Data Transfer (100 GB) | $4.50 |
-
-**Subtotal**: ~$92/month
-
-### Other Services
-
-| Service | Monthly Cost |
-|---------|--------------|
-| Route 53 | $0.50 |
-| Secrets Manager | $4.00 |
-| ECR (10 GB) | $1.00 |
-| CloudWatch Logs (10 GB) | $5.00 |
-| CloudWatch Alarms (10) | $1.00 |
-| X-Ray (1M traces @ 5%) | $2.50 |
-| SQS (500K requests) | $0.20 |
-| S3 (25 GB) | $0.58 |
-
-**Subtotal**: ~$15/month
-
-### Staging Environment Total
-
-| Category | Monthly Cost |
-|----------|--------------|
-| Compute (Fargate) | $228 |
-| Database (RDS) | $60 |
-| Cache (Redis) | $49 |
-| Search (OpenSearch) | $29 |
-| Networking | $92 |
-| Other Services | $15 |
-| **Subtotal** | $473 |
-| **Buffer (20%)** | $95 |
-| **Total** | **~$570** |
-
----
-
-## Production Environment
-
-### Compute (ECS Fargate)
-
-Based on baseline 3 tasks per service (scales 2-10 based on load):
-
-| Service | Tasks | vCPU | Memory (GB) | Hours/Month | Cost |
-|---------|-------|------|-------------|-------------|------|
-| api-gateway | 3 | 0.5 | 1 | 2190 | $56.94 |
-| user-service | 3 | 0.5 | 1 | 2190 | $56.94 |
-| video-service | 3 | 0.5 | 1 | 2190 | $56.94 |
-| location-service | 3 | 0.5 | 1 | 2190 | $56.94 |
-| search-service | 3 | 0.5 | 1 | 2190 | $56.94 |
-| moderation-service | 2 | 0.25 | 0.5 | 1460 | $18.98 |
-| notification-service | 2 | 0.25 | 0.5 | 1460 | $18.98 |
-
-**Subtotal**: ~$323/month (baseline, add 50% for auto-scaling headroom = ~$485)
-
-### Database (RDS PostgreSQL)
-
-| Setting | Value | Monthly Cost (On-Demand) | Reserved (1yr) |
-|---------|-------|--------------------------|----------------|
-| Primary Instance | db.r6g.large (2 vCPU, 16 GB) | $175.20 | $105.12 |
-| Read Replica | db.r6g.large | $175.20 | $105.12 |
-| Storage | 100 GB gp3 | $11.50 | $11.50 |
-| Multi-AZ | Enabled | Included in instance | - |
-| Backup | 30 day retention | ~$15.00 | $15.00 |
-| Cross-Region Backup | 7 days to us-west-2 | ~$12.00 | $12.00 |
-| Performance Insights | Enabled | Free | Free |
-
-**Subtotal**: ~$389/month on-demand, ~$249/month reserved
-
-### Cache (ElastiCache Redis)
-
-| Setting | Value | Monthly Cost (On-Demand) | Reserved (1yr) |
-|---------|-------|--------------------------|----------------|
-| Node Type | cache.r6g.large | $195.26 | $117.16 |
-| Nodes | 2 (cluster) | $390.52 | $234.32 |
-| Multi-AZ | Enabled | Included | - |
-
-**Subtotal**: ~$391/month on-demand, ~$234/month reserved
-
-### Search (OpenSearch)
-
-| Setting | Value | Monthly Cost (On-Demand) | Reserved (1yr) |
-|---------|-------|--------------------------|----------------|
-| Instance | r6g.large.search | $130.34 | $78.20 |
-| Nodes | 3 | $391.02 | $234.60 |
-| Storage | 100 GB (across nodes) | $12.70 | $12.70 |
-
-**Subtotal**: ~$404/month on-demand, ~$247/month reserved
-
-### Networking
-
-| Service | Monthly Cost |
-|---------|--------------|
-| ALB | $22.27 |
-| ALB LCU (est. 10 LCU avg) | $58.40 |
-| NAT Gateway (2 AZ) | $65.70 |
-| NAT Data Transfer (500 GB) | $22.50 |
-
-**Subtotal**: ~$169/month
-
-### CDN (CloudFront)
+### Messaging (SQS)
 
 | Usage | Monthly Cost |
 |-------|--------------|
-| Data Transfer (500 GB) | $42.50 |
-| Requests (10M) | $7.50 |
-
-**Subtotal**: ~$50/month
-
-### Security (WAF)
-
-| Component | Monthly Cost |
-|-----------|--------------|
-| Web ACL | $5.00 |
-| Rules (10) | $10.00 |
-| Requests (10M) | $6.00 |
-
-**Subtotal**: ~$21/month
+| ~500K requests/month | $0.20 |
 
 ### Other Services
 
 | Service | Monthly Cost |
 |---------|--------------|
-| Route 53 (queries) | $2.00 |
-| Secrets Manager | $4.00 |
-| ECR (20 GB) | $2.00 |
-| CloudWatch Logs (50 GB) | $25.00 |
-| CloudWatch Metrics | $3.00 |
-| CloudWatch Alarms (20) | $2.00 |
-| CloudWatch Dashboards (3) | $9.00 |
-| X-Ray (5M traces @ 5%) | $12.50 |
-| SQS (5M requests) | $2.00 |
-| S3 (50 GB + DR replication) | $3.00 |
-| SES (10K emails) | $1.00 |
+| Route 53 (1 hosted zone + queries) | $0.50 |
+| Secrets Manager (4 secrets) | $1.60 |
+| ECR (5 GB images) | $0.50 |
+| CloudWatch Logs (5 GB) | $2.50 |
+| CloudWatch Alarms (6) | $0.60 |
+| S3 (5 GB backups) | $0.12 |
+| Elastic IP | $3.65 |
+| **Subtotal** | **~$9.47** |
 
-**Subtotal**: ~$66/month
+### Phase 1 Total
 
-### Production Environment Total
+| Category | Year 1 Monthly | After Year 1 Monthly |
+|----------|----------------|---------------------|
+| Compute (EC2) | $122.64 | $122.64 |
+| Database (RDS) | $1.40 | $16.11 |
+| Messaging (SQS) | $0.20 | $0.20 |
+| Other Services | $9.47 | $9.47 |
+| **Total** | **~$134** | **~$148** |
+| **Total + 20% buffer** | **~$162** | **~$177** |
 
-| Category | On-Demand | With Reserved Instances |
-|----------|-----------|-------------------------|
-| Compute (Fargate) | $485 | $485 |
-| Database (RDS) | $389 | $249 |
-| Cache (Redis) | $391 | $234 |
-| Search (OpenSearch) | $404 | $247 |
-| Networking | $169 | $169 |
-| CDN (CloudFront) | $50 | $50 |
-| Security (WAF) | $21 | $21 |
-| Other Services | $66 | $66 |
-| **Subtotal** | $1,975 | $1,521 |
-| **Buffer (20%)** | $395 | $304 |
-| **Total** | **~$2,370** | **~$1,825** |
+**Not included in Phase 1** (deferred to later phases): ALB, NAT Gateway, ElastiCache, OpenSearch, CloudFront, WAF, X-Ray, CodePipeline, CodeBuild. Redis runs as a Docker container on the EC2 instance at no additional cost.
 
 ---
 
@@ -263,59 +113,131 @@ Per [05-DataArchitecture.md](05-DataArchitecture.md), YouTube metadata is cached
 
 ---
 
-## Annual Cost Summary
+## Phase 2 Cost Projection (Growth)
 
-### Year 1 Costs (All Environments)
+Triggered when Phase 1 capacity is exceeded. See [07-InfrastructureArchitecture.md](07-InfrastructureArchitecture.md#phase-1--phase-2-migration-triggers) for triggers.
 
-| Item | Monthly | Annual |
-|------|---------|--------|
-| Staging | $700 | $8,400 |
-| Production (On-Demand) | $2,370 | $28,440 |
-| Google Maps (with caching) | $25 | $300 |
-| **Total (On-Demand)** | **$3,095** | **$37,140** |
+| Category | Monthly Cost |
+|----------|--------------|
+| Compute (ECS Fargate, 1 task/svc) | $228 |
+| Database (RDS db.t3.medium) | $60 |
+| Cache (ElastiCache cache.t3.medium) | $49 |
+| Networking (ALB + NAT Gateway) | $92 |
+| Other Services | $15 |
+| **Subtotal** | **$444** |
+| **Buffer (20%)** | **$81** |
+| **Total** | **~$525** |
 
-### Year 1 Costs (With Reserved Instances)
-
-| Item | Monthly | Annual |
-|------|---------|--------|
-| Staging | $700 | $8,400 |
-| Production (Reserved) | $1,825 | $21,900 |
-| Google Maps (with caching) | $25 | $300 |
-| **Total** | **$2,550** | **$30,600** |
-
-**Savings with Reserved Instances**: ~$6,500/year (17%)
-
-*Note: Caching keeps Google Maps costs stable at ~$25/month regardless of traffic growth.*
+**Key cost drivers vs Phase 1**: ECS Fargate compute (~$228 vs $123 EC2), ElastiCache (~$49 vs $0 containerized Redis), NAT Gateway (~$66).
 
 ---
 
-## Cost Scaling Projections
+## Phase 3 Cost Projection (Scale)
 
-Based on documented growth targets:
+Triggered when PostgreSQL FTS or single-task ECS becomes a bottleneck. See [07-InfrastructureArchitecture.md](07-InfrastructureArchitecture.md#phase-2--phase-3-migration-triggers) for triggers.
 
-| Metric | Year 1 | Year 3 | Year 5 |
-|--------|--------|--------|--------|
-| Concurrent Users | 500 | 5,000 | 50,000 |
-| Estimated Monthly Cost | $3,000 | $8,000 | $25,000 |
+### Production Environment
 
-**Note**: Costs scale sub-linearly due to:
-- Reserved instance discounts at scale
-- More efficient resource utilization
-- Caching reduces API calls
+| Category | Monthly Cost |
+|----------|--------------|
+| Compute (ECS Fargate, 2 tasks/svc) | $456 |
+| Database (RDS db.r6g.large, Multi-AZ) | $389 |
+| Cache (ElastiCache cache.r6g.large, 2-node) | $391 |
+| Search (OpenSearch r6g.large, 3-node) | $404 |
+| Networking (ALB + NAT Gateway) | $169 |
+| CDN (CloudFront) | $50 |
+| Security (WAF) | $21 |
+| Other Services (incl. X-Ray) | $66 |
+| **Subtotal** | **$1,946** |
+
+> **Note**: Production compute at 2 tasks/svc is lower than Phase 4's auto-scaling baseline. Exact costs depend on traffic patterns.
+
+### Staging Environment (Introduced in Phase 3)
+
+At this user scale, changes should be validated before production. Staging is introduced:
+
+| Category | Monthly Cost |
+|----------|--------------|
+| Compute (ECS Fargate, 2 tasks/svc) | $228 |
+| Database (RDS db.t3.medium) | $60 |
+| Cache (ElastiCache cache.t3.medium) | $49 |
+| Search (OpenSearch t3.small.search) | $29 |
+| Networking (ALB + NAT Gateway) | $92 |
+| Other Services | $15 |
+| **Subtotal** | **$473** |
+| **Buffer (20%)** | **$95** |
+| **Total** | **~$570** |
+
+### Phase 3 Combined Total
+
+| Environment | Monthly Cost |
+|-------------|--------------|
+| Production (with buffer) | ~$1,572 |
+| Staging (with buffer) | ~$570 |
+| **Total** | **~$2,142** |
+
+---
+
+## Phase 4 Cost Projection (Full Production)
+
+The target-state infrastructure with auto-scaling, cross-region DR, and reserved instances.
+
+### Production Environment
+
+| Category | On-Demand | With Reserved Instances |
+|----------|-----------|-------------------------|
+| Compute (Fargate, auto-scaling baseline) | $485 | $485 |
+| Database (RDS) | $389 | $249 |
+| Cache (Redis) | $391 | $234 |
+| Search (OpenSearch) | $404 | $247 |
+| Networking | $169 | $169 |
+| CDN (CloudFront) | $50 | $50 |
+| Security (WAF) | $21 | $21 |
+| Other Services | $66 | $66 |
+| **Subtotal** | $1,975 | $1,521 |
+| **Buffer (20%)** | $395 | $304 |
+| **Total** | **~$2,370** | **~$1,825** |
+
+### Staging Environment
+
+Unchanged from Phase 3: **~$570/month**
+
+### Phase 4 Combined Total
+
+| Configuration | Production | Staging | Total |
+|---------------|------------|---------|-------|
+| On-Demand | ~$2,370 | ~$570 | **~$2,940** |
+| With Reserved Instances | ~$1,825 | ~$570 | **~$2,395** |
+
+---
+
+## Annual Cost Summary
+
+| Phase | Monthly | Annual | Notes |
+|-------|---------|--------|-------|
+| Phase 1 (Year 1) | ~$162 | ~$1,944 | RDS free tier |
+| Phase 1 (After Year 1) | ~$177 | ~$2,124 | RDS on-demand |
+| Phase 2 | ~$550 | ~$6,600 | Incl. external APIs |
+| Phase 3 | ~$2,167 | ~$26,004 | Prod + staging + APIs |
+| Phase 4 (On-Demand) | ~$2,965 | ~$35,580 | Prod + staging + APIs |
+| Phase 4 (Reserved) | ~$2,420 | ~$29,040 | Prod + staging + APIs |
+
+**Savings with Reserved Instances (Phase 4)**: ~$6,500/year (18%)
 
 ---
 
 ## Cost Optimization Recommendations
 
-1. **Purchase Reserved Instances** for production RDS, ElastiCache, and OpenSearch (saves ~$6,500/year)
+### Phase 1 (Current)
+1. **Leverage free tier**: RDS db.t4g.micro is free for 12 months — plan Phase 2 migration timing accordingly
+2. **Monitor EC2 utilization**: Right-size if CPU stays below 40% (consider t3.large) or triggers Phase 2 if above 70%
+3. **Set billing alerts**: Configure AWS Budgets at $200, $300, and $500 monthly thresholds
+4. **Aggressive caching**: Redis caching for geocoding (30-day TTL) and YouTube metadata (24-hour TTL) keeps API costs stable (~$25/month) regardless of traffic growth. See [05-DataArchitecture.md](05-DataArchitecture.md) for cache key patterns.
 
-2. **Use Spot instances for staging** Fargate tasks where interruption is acceptable (saves 70%)
-
-4. **Aggressive caching implemented** - Redis caching for geocoding (30-day TTL) and YouTube metadata (24-hour TTL) keeps API costs stable (~$25/month) regardless of traffic growth. See [05-DataArchitecture.md](05-DataArchitecture.md) for cache key patterns.
-
-5. **Right-size instances** based on actual utilization after launch
-
-6. **Set up billing alerts** at $3,000, $4,000, and $5,000 monthly thresholds
+### Phase 2+
+5. **Use Spot instances for staging** Fargate tasks where interruption is acceptable (saves 70%)
+6. **Purchase Reserved Instances** when committing to Phase 4 (saves ~$6,500/year for RDS, ElastiCache, OpenSearch)
+7. **Right-size instances** based on actual utilization data collected during earlier phases
 
 ---
 
@@ -338,3 +260,4 @@ Based on documented growth targets:
 |---------|------|--------|---------|
 | 1.0 | 2025-01-31 | Claude | Initial cost estimate |
 | 1.1 | 2025-01-31 | Claude | Document caching strategy, fix cost calculations, add subtotals |
+| 2.0 | 2025-02-02 | Claude | Restructure around 4-phase deployment strategy, Phase 1 as current |

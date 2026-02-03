@@ -278,7 +278,7 @@ Location
 ## Search Service
 
 ### Overview
-Provides full-text and faceted search across video content.
+Provides full-text and faceted search across video content. Uses a pluggable search backend — PostgreSQL FTS in Phases 1-2, OpenSearch in Phase 3+.
 
 ### Technology Stack
 | Component | Technology |
@@ -286,15 +286,27 @@ Provides full-text and faceted search across video content.
 | Framework | Spring Boot 3.x |
 | Language | Java 21 |
 | Build Tool | Gradle 9.x |
-| Search Engine | OpenSearch |
+| Search Engine | PostgreSQL FTS (Phase 1-2), OpenSearch (Phase 3+) |
 
 ### Responsibilities
-- Index video documents
-- Full-text search execution
-- Faceted filtering
-- Autocomplete suggestions
-- Search result ranking
-- Synonym handling
+- Full-text search execution with weighted ranking (title > channel > description)
+- Faceted filtering (amendments, participants, state, date range)
+- Synonym handling via custom dictionary (e.g., "1A" → "First Amendment", "cop" → "police")
+- Search result ranking by relevance
+- Autocomplete suggestions (Phase 1-2: prefix matching via SQL `LIKE`; Phase 3+: OpenSearch completion suggester)
+- Index video documents (Phase 3+: OpenSearch indexing via SQS events; Phase 1-2: handled by PostgreSQL trigger)
+
+### Implementation Note
+
+The search backend is abstracted behind a `SearchRepository` interface:
+
+```
+SearchRepository (interface)
+├── PostgresSearchRepository  — active in Phase 1-2 (Spring profile: "fts")
+└── OpenSearchRepository      — active in Phase 3+  (Spring profile: "opensearch")
+```
+
+The active implementation is selected via Spring profile (`spring.profiles.active=fts` or `spring.profiles.active=opensearch`). Both implementations expose the same search, suggest, and facet operations. This allows transparent migration to OpenSearch by switching the profile and running a one-time index backfill.
 
 ### API Endpoints
 | Method | Path | Auth | Description |
@@ -348,12 +360,13 @@ GET /search
 ### Events Consumed
 | Event | Action |
 |-------|--------|
-| VideoApproved | Index document |
-| VideoUpdated | Update document |
-| VideoDeleted | Remove document |
+| VideoApproved | Phase 1-2: no action (tsvector trigger handles indexing); Phase 3+: index document in OpenSearch |
+| VideoUpdated | Phase 1-2: no action (tsvector trigger handles updates); Phase 3+: update document in OpenSearch |
+| VideoDeleted | Phase 1-2: no action (CASCADE delete removes row); Phase 3+: remove document from OpenSearch |
 
 ### Dependencies
-- OpenSearch (search index)
+- PostgreSQL (Phase 1-2: search via FTS)
+- OpenSearch (Phase 3+: search index)
 - SQS (event consumption)
 
 ---

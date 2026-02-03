@@ -15,21 +15,23 @@
 
 ### Throughput Requirements
 
-| Metric | Initial Target | Growth Target |
-|--------|----------------|---------------|
-| Concurrent users | 500 | 5,000 |
-| Requests per second | 200 | 2,000 |
-| Video submissions/day | 100 | 1,000 |
-| Search queries/day | 10,000 | 100,000 |
+| Metric | Phase 1 (Launch) | Phase 2 (Growth) | Phase 3 (Scale) | Phase 4 (Full Prod) |
+|--------|-------------------|-------------------|-----------------|---------------------|
+| Concurrent users | 200 | 500 | 2,000 | 5,000 |
+| Requests per second | 50 | 200 | 1,000 | 2,000 |
+| Video submissions/day | 25 | 100 | 500 | 1,000 |
+| Search queries/day | 5,000 | 10,000 | 50,000 | 100,000 |
 
 ## Availability Requirements
 
-| Component | Availability Target | Maximum Downtime/Month |
-|-----------|---------------------|------------------------|
-| Public API | 99.9% | 43 minutes |
-| Map display | 99.9% | 43 minutes |
-| Authentication | 99.95% | 22 minutes |
-| Admin functions | 99.5% | 3.6 hours |
+Availability targets vary by deployment phase. Phase 1 accepts higher downtime risk in exchange for lower cost.
+
+| Component | Phase 1 (Launch) | Phase 2 (Growth) | Phase 3-4 (Scale/Prod) |
+|-----------|-------------------|-------------------|------------------------|
+| Public API | 99.5% (~3.6 hr/mo) | 99.9% (~43 min/mo) | 99.9% (~43 min/mo) |
+| Map display | 99.5% (~3.6 hr/mo) | 99.9% (~43 min/mo) | 99.9% (~43 min/mo) |
+| Authentication | 99.5% (~3.6 hr/mo) | 99.9% (~43 min/mo) | 99.95% (~22 min/mo) |
+| Admin functions | 99.0% (~7.3 hr/mo) | 99.5% (~3.6 hr/mo) | 99.5% (~3.6 hr/mo) |
 
 ## Scalability Requirements
 
@@ -67,10 +69,16 @@
 - No storage of external video content (YouTube links only)
 
 ### Infrastructure Security
-- VPC isolation with private subnets for databases
-- WAF protection for public endpoints
-- Security group least-privilege access
-- Secrets management via AWS Secrets Manager
+
+Security controls scale with deployment phase:
+
+| Control | Phase 1 (Launch) | Phase 2 (Growth) | Phase 3-4 (Scale/Prod) |
+|---------|-------------------|-------------------|------------------------|
+| Network isolation | Public subnet (EC2) + data subnet (RDS) | VPC with private subnets for ECS | Full VPC with public/private/data subnets |
+| Endpoint protection | Nginx rate limiting | ALB + security groups | WAF + ALB + CloudFront |
+| Secrets management | AWS Secrets Manager | AWS Secrets Manager | AWS Secrets Manager |
+| TLS | Let's Encrypt (certbot) | ACM (ALB-terminated) | ACM (ALB + CloudFront) |
+| Access control | Security groups (least-privilege) | Security groups | Security groups + WAF rules |
 
 ## Compliance Requirements
 
@@ -95,12 +103,12 @@
 | Backend Framework | Spring Boot 3.2.x | Production-ready, extensive ecosystem |
 | API Protocol | REST + OpenAPI 3.0 | Industry standard, tooling support |
 | Primary Database | PostgreSQL 15 with PostGIS | Relational + spatial queries |
-| Search Engine | OpenSearch 2.x | Full-text + faceted search |
+| Search Engine | PostgreSQL FTS (Phase 1-2), OpenSearch 2.x (Phase 3+) | Full-text + faceted search |
 | Cache | Redis 7.x | Session, caching, rate limiting |
 | Message Queue | Amazon SQS | Async processing, decoupling |
 | Container Runtime | Docker 24.x | Consistent environments |
 | Build Tool | Gradle 9.x | Build automation |
-| Container Orchestration | Amazon ECS Fargate | Serverless containers |
+| Container Orchestration | Docker Compose (Phase 1), Amazon ECS Fargate (Phase 2+) | Container management |
 | Cloud Provider | AWS | Team familiarity, service breadth |
 
 ### Frontend Technologies (Client Teams)
@@ -162,21 +170,32 @@ All backend services calling external APIs must implement these patterns:
 
 ### Monitoring & Observability
 - Centralized logging (CloudWatch Logs)
-- Distributed tracing (AWS X-Ray)
-- Metrics collection (CloudWatch Metrics, Prometheus)
-- Alerting for SLA violations
+- Distributed tracing (Phase 3+: AWS X-Ray)
+- Metrics collection (Phase 1: CloudWatch Agent; Phase 2+: CloudWatch Metrics, Prometheus)
+- Alerting for SLA violations (Phase 1: basic CloudWatch alarms; Phase 2+: full alarm suite)
 - Dashboard for system health
 
 ### Disaster Recovery
-- RPO (Recovery Point Objective): 1 hour
-- RTO (Recovery Time Objective): 4 hours
-- Daily automated backups
-- Cross-region backup replication
-- Documented recovery procedures
+
+DR capabilities scale with deployment phase:
+
+| Metric | Phase 1 (Launch) | Phase 2 (Growth) | Phase 3 (Scale) | Phase 4 (Full Prod) |
+|--------|-------------------|-------------------|-----------------|---------------------|
+| RPO | 24 hours | 4 hours | 1 hour | 1 hour |
+| RTO | ~30 min (same AZ) | ~15 min (ECS redeploy) | 4 hours (cross-AZ) | 4 hours (cross-region) |
+| Backups | RDS daily snapshots (7-day) | RDS daily + PITR | RDS + OpenSearch snapshots | All + cross-region replication |
+| Redundancy | None (single EC2) | ECS task restart | Multi-AZ (RDS, ECS) | Multi-AZ + DR region |
 
 ### Deployment
-- Zero-downtime deployments
-- Blue-green or rolling deployment strategy
-- Automated rollback capability
-- Feature flags for gradual rollout
-- Environment parity (dev, staging, production)
+
+Deployment strategy evolves with deployment phase:
+
+| Aspect | Phase 1 (Launch) | Phase 2 (Growth) | Phase 3-4 (Scale/Prod) |
+|--------|-------------------|-------------------|------------------------|
+| Strategy | Docker Compose via SSH | ECS rolling deploy | Blue-green with canary |
+| Downtime | Brief (~30s during redeploy) | Zero-downtime (rolling) | Zero-downtime |
+| Rollback | Manual (previous image tag) | ECS task rollback | Automated (CodeDeploy) |
+| Environments | Production only | Production only | Staging + Production |
+| CI/CD | GitHub Actions → ECR → SSH | GitHub Actions → ECR → ECS | CodePipeline → CodeBuild → ECS |
+
+> **Note**: Staging environment is deferred until Phase 3. During Phases 1-2, pre-production testing relies on local Docker Compose and CI pipeline checks.

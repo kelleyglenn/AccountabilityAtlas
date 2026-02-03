@@ -6,12 +6,13 @@ AccountabilityAtlas uses a polyglot persistence strategy with three primary data
 
 ## Data Store Summary
 
-| Store | Technology | Purpose | Services |
-|-------|------------|---------|----------|
-| Primary Database | PostgreSQL 15 + PostGIS | Transactional data, spatial queries | All services |
-| Search Index | OpenSearch 2.x | Full-text search, faceting | search-service |
-| Cache | Redis 7.x | Sessions, caching, rate limiting | api-gateway, user-service, location-service |
-| Message Queue | Amazon SQS | Async events, decoupling | All services |
+| Store | Technology | Purpose | Services | Phase |
+|-------|------------|---------|----------|-------|
+| Primary Database | PostgreSQL 15 + PostGIS | Transactional data, spatial queries | All services | All |
+| Full-Text Search | PostgreSQL FTS (`tsvector`/GIN) | Search, faceting, autocomplete | search-service | 1-2 |
+| Search Index | OpenSearch 2.x | Full-text search, faceting, fuzzy matching | search-service | 3+ |
+| Cache | Redis 7.x (container Phase 1, ElastiCache Phase 2+) | Sessions, caching, rate limiting | api-gateway, user-service, location-service | All |
+| Message Queue | Amazon SQS | Async events, decoupling | All services | All |
 
 ---
 
@@ -268,6 +269,134 @@ CREATE INDEX idx_video_locations_video ON content.video_locations(video_id);
 CREATE INDEX idx_video_locations_location ON content.video_locations(location_id);
 ```
 
+### Full-Text Search Configuration (Phase 1-2)
+
+During Phases 1-2, full-text search is handled by PostgreSQL's built-in FTS engine instead of OpenSearch. This eliminates the need for a separate search service while providing weighted ranking, synonym support, and phrase search.
+
+#### Search Vector Column and Trigger
+
+```sql
+-- Add search vector column to videos table
+ALTER TABLE content.videos ADD COLUMN search_vector tsvector;
+
+-- Create custom text search configuration with synonym dictionary
+CREATE TEXT SEARCH DICTIONARY acct_atlas_synonyms (
+    TEMPLATE = synonym,
+    SYNONYMS = acct_atlas  -- references $SHAREDIR/tsearch_data/acct_atlas.syn
+);
+
+-- Synonym file contents ($SHAREDIR/tsearch_data/acct_atlas.syn):
+--   1a          firstamendment
+--   first amendment  firstamendment
+--   free speech  firstamendment
+--   2a          secondamendment
+--   second amendment secondamendment
+--   gun rights  secondamendment
+--   4a          fourthamendment
+--   fourth amendment fourthamendment
+--   search seizure fourthamendment
+--   5a          fifthamendment
+--   fifth amendment fifthamendment
+--   self incrimination fifthamendment
+--   cop         police
+--   officer     police
+--   law enforcement police
+--   govt        government
+
+CREATE TEXT SEARCH CONFIGURATION acct_atlas (COPY = english);
+ALTER TEXT SEARCH CONFIGURATION acct_atlas
+    ALTER MAPPING FOR asciiword, asciihword, hword_asciipart
+    WITH acct_atlas_synonyms, english_stem;
+
+-- Trigger to maintain search_vector with weighted ranking
+-- Weights: title (A), channel_name (B), description (C)
+CREATE OR REPLACE FUNCTION content.update_video_search_vector()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.search_vector :=
+        setweight(to_tsvector('acct_atlas', COALESCE(NEW.title, '')), 'A') ||
+        setweight(to_tsvector('acct_atlas', COALESCE(NEW.channel_name, '')), 'B') ||
+        setweight(to_tsvector('acct_atlas', COALESCE(NEW.description, '')), 'C');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER videos_search_vector_trigger
+    BEFORE INSERT OR UPDATE OF title, channel_name, description ON content.videos
+    FOR EACH ROW EXECUTE FUNCTION content.update_video_search_vector();
+
+-- GIN index for fast full-text search
+CREATE INDEX idx_videos_search_vector ON content.videos USING GIN(search_vector);
+
+-- Backfill existing rows
+UPDATE content.videos SET search_vector =
+    setweight(to_tsvector('acct_atlas', COALESCE(title, '')), 'A') ||
+    setweight(to_tsvector('acct_atlas', COALESCE(channel_name, '')), 'B') ||
+    setweight(to_tsvector('acct_atlas', COALESCE(description, '')), 'C');
+```
+
+#### Example FTS Queries
+
+```sql
+-- Basic search with ranking
+SELECT id, title, ts_rank_cd(search_vector, query) AS rank
+FROM content.videos, plainto_tsquery('acct_atlas', 'police first amendment') AS query
+WHERE search_vector @@ query
+  AND status = 'APPROVED'
+ORDER BY rank DESC
+LIMIT 20;
+
+-- Phrase search
+SELECT id, title
+FROM content.videos
+WHERE search_vector @@ phraseto_tsquery('acct_atlas', 'first amendment audit')
+  AND status = 'APPROVED';
+
+-- Search with facet filtering (amendments + state)
+SELECT v.id, v.title, ts_rank_cd(v.search_vector, query) AS rank
+FROM content.videos v
+JOIN content.video_locations vl ON v.id = vl.video_id
+JOIN content.locations l ON vl.location_id = l.id
+, plainto_tsquery('acct_atlas', 'cop watch') AS query
+WHERE v.search_vector @@ query
+  AND v.status = 'APPROVED'
+  AND 'FIRST' = ANY(v.amendments)
+  AND l.state = 'CA'
+ORDER BY rank DESC;
+
+-- Headline generation (highlighted search results)
+SELECT id, title,
+    ts_headline('acct_atlas', description, plainto_tsquery('acct_atlas', 'police audit'),
+        'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15') AS snippet
+FROM content.videos
+WHERE search_vector @@ plainto_tsquery('acct_atlas', 'police audit')
+  AND status = 'APPROVED'
+ORDER BY ts_rank_cd(search_vector, plainto_tsquery('acct_atlas', 'police audit')) DESC;
+```
+
+#### Limitations and Phase 3 Migration Triggers
+
+PostgreSQL FTS is sufficient for Phases 1-2 but has limitations that trigger migration to OpenSearch:
+
+| Capability | PostgreSQL FTS | OpenSearch |
+|------------|---------------|------------|
+| Basic full-text search | Yes | Yes |
+| Weighted ranking | Yes (A/B/C/D weights) | Yes (field boosting) |
+| Synonym dictionary | Yes (file-based) | Yes (API-managed) |
+| Phrase search | Yes | Yes |
+| Faceted counts | Manual (SQL GROUP BY) | Native aggregations |
+| Fuzzy matching / typo tolerance | No | Yes |
+| "Did you mean" suggestions | No | Yes |
+| Autocomplete | Basic (prefix matching via `LIKE`) | Native (completion suggester) |
+| Geo-distance scoring | No (filter only via PostGIS) | Yes (function_score) |
+| Query performance at scale | Good to ~10 GB index | Designed for large-scale |
+
+**Migrate to OpenSearch when**:
+- Search P95 latency exceeds 500ms
+- Users need fuzzy matching or "did you mean" suggestions
+- Search index exceeds ~10 GB
+- Faceted search performance becomes a bottleneck
+
 ### Schema: moderation
 
 ```sql
@@ -430,7 +559,9 @@ WHERE sys_period && tstzrange('2025-01-01', '2025-06-01');
 
 ---
 
-## OpenSearch Index Design
+## OpenSearch Index Design (Phase 3+)
+
+> **Note**: OpenSearch is introduced in Phase 3 when search volume or feature requirements exceed PostgreSQL FTS capabilities. During Phases 1-2, all search queries are served by PostgreSQL full-text search. See [Full-Text Search Configuration (Phase 1-2)](#full-text-search-configuration-phase-1-2) above.
 
 ### videos Index
 
@@ -606,7 +737,8 @@ Limits by trust tier:
 4. (If approved) Video Service → SQS (VideoApproved event)
 
 5. Search Service ← SQS
-   - Index video document in OpenSearch
+   - Phase 1-2: tsvector is updated automatically via database trigger (no action needed)
+   - Phase 3+: Index video document in OpenSearch
 
 6. Location Service ← SQS
    - Update location_stats.video_count
@@ -620,9 +752,15 @@ Limits by trust tier:
 ```
 1. Client → API Gateway → Search Service
 
-2. Search Service → OpenSearch
+2a. Phase 1-2: Search Service → PostgreSQL
+   - Execute FTS query using tsvector/tsquery
+   - Apply filters via SQL WHERE clauses
+   - Faceted counts via GROUP BY
+   - Return paginated results
+
+2b. Phase 3+: Search Service → OpenSearch
    - Execute search query
-   - Apply filters and facets
+   - Apply filters and facets via aggregations
    - Return paginated results
 
 3. Search Service → Redis (optional)
@@ -636,17 +774,17 @@ Limits by trust tier:
 ## Backup and Recovery
 
 ### PostgreSQL
-- Automated daily snapshots via RDS
-- Point-in-time recovery enabled (5-minute granularity)
-- Cross-region replica for DR
+- **Phase 1**: RDS automated daily snapshots, 7-day retention, no cross-region
+- **Phase 2+**: Point-in-time recovery enabled (5-minute granularity)
+- **Phase 4**: Cross-region replica for DR
 
-### OpenSearch
+### OpenSearch (Phase 3+)
 - Automated hourly snapshots to S3
 - Rebuild-from-source capability (PostgreSQL is source of truth)
 
 ### Redis
-- No backup required (cache only)
-- Rebuild from source on failure
+- **Phase 1**: Container volume — no backup needed (cache only, rebuilds on restart)
+- **Phase 2+**: ElastiCache — no backup required (cache only, rebuild from source on failure)
 
 ---
 
