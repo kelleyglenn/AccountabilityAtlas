@@ -22,6 +22,7 @@
 | JSON Processing | Jackson |
 | HTTP Client | Spring WebClient |
 | Validation | Jakarta Bean Validation |
+| Boilerplate Reduction | Lombok |
 | Testing | JUnit 5, Mockito, TestContainers |
 | Logging | SLF4J + Logback |
 | Metrics | Micrometer |
@@ -251,12 +252,12 @@ Enforces consistent code style using [google-java-format](https://github.com/goo
 ```gradle
 // build.gradle
 plugins {
-    id 'com.diffplug.spotless' version '6.25.0'
+    id 'com.diffplug.spotless' version '8.2.1'
 }
 
 spotless {
     java {
-        googleJavaFormat('1.19.2')
+        googleJavaFormat()
         removeUnusedImports()
         trimTrailingWhitespace()
         endWithNewline()
@@ -275,17 +276,16 @@ Catches common Java bugs at compile time.
 ```gradle
 // build.gradle
 plugins {
-    id 'net.ltgt.errorprone' version '3.1.0'
+    id 'net.ltgt.errorprone' version '5.0.0'
 }
 
 dependencies {
-    errorprone 'com.google.errorprone:error_prone_core:2.24.1'
+    errorprone 'com.google.errorprone:error_prone_core:2.45.0'
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.errorprone {
         disableWarningsInGeneratedCode = true
-        error('NullAway')  // Promote NullAway to error
     }
 }
 ```
@@ -302,6 +302,120 @@ SonarLint detects:
 - Code smells and maintainability issues
 - Security vulnerabilities (OWASP Top 10)
 - Bug patterns specific to Spring Boot
+
+#### JaCoCo (Code Coverage)
+
+Enforces minimum test coverage threshold.
+
+```gradle
+// build.gradle
+plugins {
+    id 'jacoco'
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.80  // 80% coverage required
+            }
+        }
+    }
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                'com/accountabilityatlas/*/web/api/**',    // Generated API interfaces
+                'com/accountabilityatlas/*/web/model/**',  // Generated DTOs
+            ])
+        }))
+    }
+}
+
+check.dependsOn jacocoTestCoverageVerification
+```
+
+Commands:
+- `./gradlew test jacocoTestReport` - Generate coverage report
+- `./gradlew check` - Runs tests and verifies coverage threshold
+
+#### OpenAPI Generator
+
+Generates Spring interfaces and DTOs from OpenAPI specifications.
+
+```gradle
+// build.gradle
+plugins {
+    id 'org.openapi.generator' version '7.19.0'
+}
+
+openApiGenerate {
+    generatorName = 'spring'
+    inputSpec = "${projectDir}/docs/api-specification.yaml"
+    outputDir = layout.buildDirectory.dir('generated').get().asFile.path
+    apiPackage = 'com.accountabilityatlas.servicename.web.api'
+    modelPackage = 'com.accountabilityatlas.servicename.web.model'
+    configOptions = [
+        interfaceOnly        : 'true',
+        useTags              : 'true',
+        useSpringBoot3       : 'true',
+        documentationProvider: 'none',
+        openApiNullable      : 'true',
+        useJakartaEe         : 'true',
+        skipDefaultInterface : 'true',
+    ]
+}
+
+sourceSets.main.java.srcDir layout.buildDirectory.dir('generated/src/main/java')
+compileJava.dependsOn tasks.named('openApiGenerate')
+```
+
+#### Jib (Container Images)
+
+Builds optimized Docker images without a Dockerfile.
+
+```gradle
+// build.gradle
+plugins {
+    id 'com.google.cloud.tools.jib' version '3.5.2'
+}
+
+jib {
+    from {
+        image = 'eclipse-temurin:21-jre-alpine'
+    }
+    to {
+        image = 'acctatlas/service-name'
+        tags = [version, 'latest']
+    }
+    container {
+        mainClass = 'com.accountabilityatlas.servicename.ServiceNameApplication'
+        ports = ['8080']
+    }
+}
+```
+
+Commands:
+- `./gradlew jibDockerBuild` - Build image to local Docker daemon
+- `./gradlew jib` - Build and push to registry
+
+#### TestContainers
+
+Integration testing with real databases via Docker.
+
+```gradle
+// build.gradle (dependencies)
+testImplementation 'org.testcontainers:testcontainers:1.21.4'
+testImplementation 'org.testcontainers:junit-jupiter:1.21.4'
+testImplementation 'org.testcontainers:postgresql:1.21.4'
+```
+
+```gradle
+// build.gradle (test configuration)
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    jvmArgs '-XX:+EnableDynamicAgentLoading'  // Fixes Mockito dynamic agent warning
+}
+```
 
 ### TypeScript (Frontend / Web App)
 
@@ -549,6 +663,39 @@ class VideoIntegrationTest {
 }
 ```
 
+### Common Testing Pitfalls
+
+#### Configuration Class Dependencies
+
+When adding new beans to shared configuration classes (like `SecurityConfig`), you may break unrelated `@WebMvcTest` tests that load that configuration.
+
+**Example problem**: You add a `JwtAuthenticationFilter` to `SecurityConfig`:
+
+```java
+@Configuration
+public class SecurityConfig {
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
+}
+```
+
+Now `AuthControllerTest` fails with `NoSuchBeanDefinitionException` for `JwtAuthenticationFilter`, even though that test doesn't use the filter.
+
+**Solution**: Add a mock bean for the new dependency in affected tests:
+
+```java
+@WebMvcTest(AuthController.class)
+class AuthControllerTest {
+    @MockitoBean private JwtAuthenticationFilter jwtAuthenticationFilter;  // Required for SecurityConfig
+    // ... rest of test
+}
+```
+
+This pattern applies whenever you add constructor dependencies to configuration classes that are loaded by the test context.
+
 ---
 
 ## Database Migration Standards
@@ -744,8 +891,14 @@ docker-compose up -d postgres redis
 # Run service
 ./gradlew bootRun
 
-# Run tests
+# Run all tests
 ./gradlew test
+
+# Run unit tests only (no Docker required)
+./gradlew unitTest
+
+# Run integration tests only (requires Docker)
+./gradlew integrationTest
 
 # Check code formatting
 ./gradlew spotlessCheck
@@ -753,6 +906,8 @@ docker-compose up -d postgres redis
 # Auto-fix formatting issues
 ./gradlew spotlessApply
 ```
+
+Note: `bootRun` automatically activates the `local` profile (`--spring.profiles.active=local`).
 
 ### docker-compose.yml (Local Development)
 

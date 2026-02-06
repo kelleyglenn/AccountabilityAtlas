@@ -30,8 +30,19 @@ See [ChatGPT suggestions](https://chatgpt.com/s/t_6982deeabf6c8191b7753430621ec4
 
 ## Security
 
+### Pre-Production Requirements
+
+These items use temporary workarounds in local development and must be addressed before going live:
+
+1. **Shared JWT signing keys**: Currently, the API Gateway and User Service generate their own RSA key pairs at startup. In local dev, the gateway uses "passthrough mode" (`app.jwt.passthrough=true`) to let downstream services handle auth. For production, services must share signing keys via AWS Secrets Manager or similar. See [06-SecurityArchitecture.md](06-SecurityArchitecture.md#secrets-management) for the planned approach.
+
+2. **Proper 401 responses**: Spring Security returns 403 (Forbidden) by default when authentication is missing. We've configured `AuthenticationEntryPoint` in user-service to return 401, but this pattern must be applied consistently across all services that require authentication.
+
+### Future Enhancements
+
 1. **Change email**: Allow non-OAuth users to change their email address. Will require a new process so their old address is not overwritten until their new address has been verified.
 2. **Change password**: Allow non-OAuth users to change their password. Should require them to re-validate their old password, and enter their new password twice.
+3. **Separate auth service**: It's a better practice to have your authentication (auth service) separate from your authorization/profile (user service). Only becomes important when we start to scale.
 
 ## AI
 

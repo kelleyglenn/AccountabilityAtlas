@@ -47,7 +47,7 @@ See [08-DevelopmentStandards.md](docs/08-DevelopmentStandards.md) for:
 ### Common Workflows
 
 **Git workflow** (GitHub Flow):
-- `main` - always deployable (protected, requires PR approval)
+- `master` - always deployable (protected, requires PR approval)
 - `feature/{ticket}-{description}` or `fix/{ticket}-{description}` - all work branches from main
 
 **Commit messages**: Follow [Conventional Commits](https://www.conventionalcommits.org/). Include the GitHub issue number when applicable:
@@ -90,8 +90,12 @@ Each service has a `docs/technical.md` with:
 
 1. Changes to high-level architecture go in `docs/`
 2. Service-specific changes go in that service's repo
-3. Service repos must be committed/pushed separately from the top-level repo
+3. **Service repos must be committed/pushed separately from the top-level repo** - each service is its own git repository with its own commit history and PRs
 4. Keep domain models in sync between high-level docs and service docs
+
+## Environment Notes
+
+**Windows with Git Bash**: Use `/c/code/...` paths in bash commands, not `C:\code\...`. The Windows-style paths don't work in Git Bash/MSYS2.
 
 ## Delegating Work to Subagents
 
