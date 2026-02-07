@@ -8,9 +8,12 @@ A multi-tier web application for geo-located video curation focused on constitut
 AccountabilityAtlas/
 ├── docs/                              # Architecture and design documentation
 ├── scripts/
-│   ├── integration/                   # Cross-service integration tests
-│   ├── e2e/                           # Full stack end-to-end tests (future)
-│   └── deploy/                        # Deployment scripts (future)
+│   ├── dev-start.sh                   # Start all services (local dev mode)
+│   ├── dev-stop.sh                    # Stop all services (local dev mode)
+│   ├── docker-start.sh                # Start all services (docker mode)
+│   ├── docker-stop.sh                 # Stop docker services
+│   ├── lib/                           # Shared script utilities
+│   └── integration/                   # Cross-service integration tests
 ├── docker-compose.yml                 # Local multi-service development
 ├── AcctAtlas-api-gateway/             # API Gateway service
 ├── AcctAtlas-user-service/            # User management and authentication
@@ -20,6 +23,8 @@ AccountabilityAtlas/
 ├── AcctAtlas-moderation-service/      # Content moderation
 ├── AcctAtlas-notification-service/    # User notifications
 └── AcctAtlas-web-app/                 # Frontend web application
+# External repository:
+# AcctAtlas-integration-tests/        # E2E and API integration tests (separate repo)
 ```
 
 Service subdirectories are independent git repositories (excluded via `.gitignore`).
@@ -34,6 +39,28 @@ Service subdirectories are independent git repositories (excluded via `.gitignor
 ## Documentation
 
 See [docs/](docs/) for complete architecture and design documentation.
+
+## Local Development
+
+Two startup modes are available:
+
+**Local Dev Mode** (fast iteration, no image rebuilds):
+```bash
+./scripts/dev-start.sh   # Starts postgres/redis via Docker, Java services via Gradle, web app via npm
+./scripts/dev-stop.sh    # Stops everything
+```
+
+**Docker Mode** (production-like):
+```bash
+# First, build Docker images for Java services
+cd AcctAtlas-user-service && ./gradlew jibDockerBuild && cd ..
+cd AcctAtlas-api-gateway && ./gradlew jibDockerBuild && cd ..
+
+./scripts/docker-start.sh   # Starts all backend services in containers
+./scripts/docker-stop.sh    # Stops containers
+```
+
+Both modes start all services and open a browser to http://localhost:3000.
 
 ## Git and GitHub
 

@@ -19,6 +19,8 @@ AccountabilityAtlas enables users to discover, contribute, and explore videos of
 | [07-InfrastructureArchitecture.md](07-InfrastructureArchitecture.md) | AWS infrastructure and deployment architecture |
 | [08-DevelopmentStandards.md](08-DevelopmentStandards.md) | Coding standards, testing, and CI/CD practices |
 | [09-CostEstimate.md](09-CostEstimate.md) | Detailed cost breakdown by environment and service |
+| [10-FutureFeatures.md](10-FutureFeatures.md) | Future features roadmap and enhancements |
+| [11-IntegrationTesting.md](11-IntegrationTesting.md) | E2E and API integration testing guide |
 
 ## Related Repositories
 
@@ -29,3 +31,4 @@ AccountabilityAtlas enables users to discover, contribute, and explore videos of
 - [AcctAtlas-search-service](https://github.com/kelleyglenn/AcctAtlas-search-service) - Search service
 - [AcctAtlas-moderation-service](https://github.com/kelleyglenn/AcctAtlas-moderation-service) - Content moderation service
 - [AcctAtlas-notification-service](https://github.com/kelleyglenn/AcctAtlas-notification-service) - Notification service
+- [AcctAtlas-integration-tests](https://github.com/kelleyglenn/AcctAtlas-integration-tests) - E2E and API integration tests
