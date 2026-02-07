@@ -1,25 +1,8 @@
 # Claude Code Context for AccountabilityAtlas
 
-## Project Overview
+See [README.md](README.md) for project overview and structure.
 
-AccountabilityAtlas is a multi-tier web application for geo-located video curation focused on constitutional rights audits. It consists of 7 microservices plus a frontend web application.
-
-## Project Structure
-
-This is a multi-repo project. The top-level repo contains project-wide configuration and architecture documentation, while each service subdirectory is its own independent git repository (excluded via `.gitignore`):
-
-```
-AccountabilityAtlas/                   # Top-level repo (config, README, CLAUDE.md, docs/)
-├── docs/                              # Architecture documentation
-├── AcctAtlas-api-gateway/             # Separate repo
-├── AcctAtlas-user-service/            # Separate repo
-├── AcctAtlas-video-service/           # Separate repo
-├── AcctAtlas-location-service/        # Separate repo
-├── AcctAtlas-search-service/          # Separate repo
-├── AcctAtlas-moderation-service/      # Separate repo
-├── AcctAtlas-notification-service/    # Separate repo
-└── AcctAtlas-web-app/                 # Separate repo
-```
+This is a **multi-repo project**: the top-level repo contains project-wide configuration and docs, while each service subdirectory is its own independent git repository (excluded via `.gitignore`).
 
 ## Key Documentation
 

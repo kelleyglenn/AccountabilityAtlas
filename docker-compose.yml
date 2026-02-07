@@ -26,7 +26,7 @@ services:
       retries: 3
 
   user-service:
-    build: ./AcctAtlas-user-service
+    image: acctatlas/user-service:latest
     ports:
       - "8081:8081"
     environment:
@@ -46,7 +46,7 @@ services:
       - backend
 
   api-gateway:
-    build: ./AcctAtlas-api-gateway
+    image: acctatlas/api-gateway:latest
     ports:
       - "8080:8080"
     environment:

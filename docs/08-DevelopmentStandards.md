@@ -578,6 +578,16 @@ paths:
 | Contract | API compatibility | Spring Cloud Contract | All endpoints |
 | E2E | Full user flows | (Client team) | Critical paths |
 
+### Unit Test Structure
+
+Unit tests should follow the **Arrange-Act-Assert (AAA)** pattern with comments marking each section:
+
+- **Arrange**: Set up test data, mocks, and preconditions
+- **Act**: Execute the method under test
+- **Assert**: Verify the expected outcomes
+
+Always include `// Arrange`, `// Act`, `// Assert` comments to clearly delineate each phase.
+
 ### Unit Test Example
 
 ```java
@@ -598,7 +608,7 @@ class VideoServiceTest {
 
     @Test
     void submitVideo_createsVideoWithPendingStatus_forNewUsers() {
-        // Given
+        // Arrange
         var request = new CreateVideoRequest(
             "https://youtube.com/watch?v=abc123",
             Set.of(Amendment.FIRST),
@@ -613,10 +623,10 @@ class VideoServiceTest {
         ));
         when(videoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        // When
+        // Act
         Video result = videoService.submitVideo(request, user);
 
-        // Then
+        // Assert
         assertThat(result.getStatus()).isEqualTo(VideoStatus.PENDING);
         assertThat(result.getYoutubeId()).isEqualTo("abc123");
         verify(eventPublisher).publish(any(VideoEvent.Submitted.class));
