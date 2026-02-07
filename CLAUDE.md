@@ -33,7 +33,7 @@ See [08-DevelopmentStandards.md](docs/08-DevelopmentStandards.md) for:
 - `master` - always deployable, **protected in all repos** (requires PR with approval)
 - `feature/{ticket}-{description}` or `fix/{ticket}-{description}` - all work branches from master
 
-**Branch protection** (applies to all service repos and AcctAtlas-integration-tests):
+**Branch protection** (applies to all repos):
 - Direct pushes to `master` are blocked
 - All changes require a pull request with at least 1 approving review
 - Code owner reviews required
