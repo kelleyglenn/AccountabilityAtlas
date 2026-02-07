@@ -63,6 +63,42 @@ End-to-end and API integration tests live in a dedicated repository:
 - Tests all three browsers (Chromium, Firefox, WebKit)
 - Uploads HTML report as artifact
 
+## Integration Test Tagging
+
+When all integration tests pass on a push to `master`, the workflow automatically tags all participating repos with matching tags for traceability.
+
+### Tag Format
+
+`integration-tested-YYYYMMDD-<run_id>`
+
+Example: `integration-tested-20260207-12345678`
+
+### Tagged Repos
+
+- `AcctAtlas-integration-tests`
+- `AcctAtlas-user-service`
+- `AcctAtlas-api-gateway`
+- `AcctAtlas-web-app`
+
+### Usage
+
+**Find last tested version of a service:**
+```bash
+git describe --tags --match "integration-tested-*"
+# Output: integration-tested-20260207-12345678-3-gabcd123
+# (3 commits ahead of last tested version)
+```
+
+**List all integration-tested tags:**
+```bash
+git tag -l "integration-tested-*"
+```
+
+**View tag details (includes link to CI run):**
+```bash
+git tag -n1 integration-tested-20260207-12345678
+```
+
 ## Test Data Management
 
 ### API-Based Seeding
