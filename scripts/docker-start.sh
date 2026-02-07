@@ -2,14 +2,14 @@
 #
 # Docker Mode Startup Script
 #
-# Starts all backend services via Docker containers:
-#   - PostgreSQL, Redis, User Service, API Gateway via docker-compose
-#   - Web App via npm run dev (not containerized yet)
+# Starts all services via Docker containers:
+#   - PostgreSQL, Redis, User Service, API Gateway, Web App via docker-compose
 #
 # Prerequisites:
-#   - Docker images must be built first:
+#   - Java service images must be built first:
 #     cd AcctAtlas-user-service && ./gradlew jibDockerBuild && cd ..
 #     cd AcctAtlas-api-gateway && ./gradlew jibDockerBuild && cd ..
+#   - Web App image is built automatically by docker-compose
 #
 # Usage:
 #   ./scripts/docker-start.sh
@@ -72,9 +72,9 @@ if [ "$IMAGES_MISSING" = true ]; then
     fi
 fi
 
-# Step 2: Start all backend services via docker-compose
-info "Starting all backend services via docker-compose..."
-docker-compose --profile backend up -d
+# Step 2: Start all services via docker-compose
+info "Starting all services via docker-compose..."
+docker-compose --profile backend --profile frontend up -d
 
 # Step 3: Wait for services to be healthy
 wait_for_docker_healthy postgres 30
@@ -87,38 +87,22 @@ wait_for_health "http://localhost:8081/actuator/health" "User Service" 60 3
 info "Waiting for API Gateway container to be ready..."
 wait_for_health "http://localhost:8080/actuator/health" "API Gateway" 60 3
 
-# Step 4: Start Web App
-info "Starting Web App..."
-cd "$ROOT_DIR/AcctAtlas-web-app"
+# Step 4: Wait for Web App to be ready
+info "Waiting for Web App container to be ready..."
+wait_for_health "http://localhost:3000" "Web App" 60 3
 
-# Install dependencies if node_modules doesn't exist
-if [ ! -d "node_modules" ]; then
-    info "Installing npm dependencies..."
-    npm install
-fi
-
-# Start dev server in background
-nohup npm run dev > "$LOGS_DIR/web-app.log" 2>&1 &
-WEB_APP_PID=$!
-save_pid "web-app" $WEB_APP_PID
-info "Web App started (PID: $WEB_APP_PID, log: logs/web-app.log)"
-
-# Step 5: Wait for Web App to be ready
-cd "$ROOT_DIR"
-wait_for_health "http://localhost:3000" "Web App" 30 2
-
-# Step 6: Open browser
+# Step 5: Open browser
 open_browser "http://localhost:3000"
 
-# Step 7: Print status
+# Step 6: Print status
 print_status
 
 echo "Docker containers:"
-docker-compose --profile backend ps
+docker-compose --profile backend --profile frontend ps
 echo ""
 echo "Logs:"
-echo "  - Backend services: docker-compose logs -f"
-echo "  - Web App:          tail -f logs/web-app.log"
+echo "  - All services:     docker-compose --profile backend --profile frontend logs -f"
+echo "  - Specific service: docker-compose logs -f <service-name>"
 echo ""
 echo "To stop all services:"
 echo "  ./scripts/docker-stop.sh"
