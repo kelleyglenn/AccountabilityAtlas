@@ -30,8 +30,14 @@ See [08-DevelopmentStandards.md](docs/08-DevelopmentStandards.md) for:
 ### Common Workflows
 
 **Git workflow** (GitHub Flow):
-- `master` - always deployable (protected, requires PR approval)
-- `feature/{ticket}-{description}` or `fix/{ticket}-{description}` - all work branches from main
+- `master` - always deployable, **protected in all repos** (requires PR with approval)
+- `feature/{ticket}-{description}` or `fix/{ticket}-{description}` - all work branches from master
+
+**Branch protection** (applies to all service repos and AcctAtlas-integration-tests):
+- Direct pushes to `master` are blocked
+- All changes require a pull request with at least 1 approving review
+- Code owner reviews required
+- Always create a feature branch, open a PR, and merge via GitHub
 
 **Commit messages**: Follow [Conventional Commits](https://www.conventionalcommits.org/). Include the GitHub issue number when applicable:
 ```
