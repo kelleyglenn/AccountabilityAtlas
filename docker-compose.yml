@@ -73,5 +73,25 @@ services:
     profiles:
       - backend
 
+  web-app:
+    build:
+      context: ./AcctAtlas-web-app
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      api-gateway:
+        condition: service_started
+    profiles:
+      - frontend
+
 volumes:
   postgres_data:

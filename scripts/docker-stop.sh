@@ -2,14 +2,13 @@
 #
 # Docker Mode Stop Script
 #
-# Stops all Docker containers and optionally the Web App.
+# Stops all Docker containers.
 #
 # Usage:
-#   ./scripts/docker-stop.sh [--volumes] [--all]
+#   ./scripts/docker-stop.sh [--volumes]
 #
 # Options:
 #   --volumes    Also remove Docker volumes (deletes database data)
-#   --all        Also stop Web App (npm dev process)
 #
 
 set -e
@@ -20,15 +19,10 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 # Parse arguments
 REMOVE_VOLUMES=false
-STOP_WEBAPP=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         --volumes)
             REMOVE_VOLUMES=true
-            shift
-            ;;
-        --all)
-            STOP_WEBAPP=true
             shift
             ;;
         *)
@@ -43,25 +37,13 @@ echo ""
 
 cd "$ROOT_DIR"
 
-# Stop Web App if requested
-if [ "$STOP_WEBAPP" = true ]; then
-    info "Stopping Web App..."
-    kill_saved_pid "web-app"
-    kill_process_on_port 3000 "node"
-fi
-
 # Stop Docker services
 if [ "$REMOVE_VOLUMES" = true ]; then
     warn "Stopping containers and removing volumes (database data will be deleted)..."
-    docker-compose --profile backend down --volumes
+    docker-compose --profile backend --profile frontend down --volumes
 else
     info "Stopping containers (volumes preserved)..."
-    docker-compose --profile backend down
-fi
-
-# Clean up PID files if we stopped the web app
-if [ "$STOP_WEBAPP" = true ]; then
-    rm -f "$LOGS_DIR"/*.pid
+    docker-compose --profile backend --profile frontend down
 fi
 
 echo ""
@@ -79,12 +61,3 @@ for port in 3000 5432 6379 8080 8081; do
     fi
 done
 echo ""
-
-if [ "$STOP_WEBAPP" = false ]; then
-    WEB_PID=$(get_pid "web-app")
-    if [ -n "$WEB_PID" ] && kill -0 "$WEB_PID" 2>/dev/null; then
-        info "Web App is still running (PID: $WEB_PID)"
-        echo "  To stop it: ./scripts/docker-stop.sh --all"
-        echo ""
-    fi
-fi
