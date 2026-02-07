@@ -11,3 +11,12 @@ GRANT ALL PRIVILEGES ON DATABASE user_service TO user_service;
 -- Connect to user_service database to set up schema permissions
 \c user_service
 GRANT ALL ON SCHEMA public TO user_service;
+
+-- Location Service database
+CREATE USER location_service WITH PASSWORD 'local_dev';  -- dev-only password
+CREATE DATABASE location_service OWNER location_service;
+GRANT ALL PRIVILEGES ON DATABASE location_service TO location_service;
+
+\c location_service
+CREATE EXTENSION IF NOT EXISTS postgis;
+GRANT ALL ON SCHEMA public TO location_service;

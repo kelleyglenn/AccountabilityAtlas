@@ -1,7 +1,7 @@
 # Local development only - do not use these credentials in production
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgis/postgis:17-3.5-alpine
     ports:
       - "5432:5432"
     environment:
@@ -51,6 +51,31 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+    profiles:
+      - backend
+
+  location-service:
+    image: acctatlas/location-service:latest
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/location_service
+      SPRING_DATASOURCE_USERNAME: location_service
+      SPRING_DATASOURCE_PASSWORD: local_dev  # dev-only
+      SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/location_service
+      SPRING_FLYWAY_USER: location_service
+      SPRING_FLYWAY_PASSWORD: local_dev  # dev-only
+      MAPBOX_ACCESS_TOKEN: ${MAPBOX_ACCESS_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      postgres:
         condition: service_healthy
     profiles:
       - backend
