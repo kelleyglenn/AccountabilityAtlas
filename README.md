@@ -7,6 +7,11 @@ A multi-tier web application for geo-located video curation focused on constitut
 ```
 AccountabilityAtlas/
 ├── docs/                              # Architecture and design documentation
+├── scripts/
+│   ├── integration/                   # Cross-service integration tests
+│   ├── e2e/                           # Full stack end-to-end tests (future)
+│   └── deploy/                        # Deployment scripts (future)
+├── docker-compose.yml                 # Local multi-service development
 ├── AcctAtlas-api-gateway/             # API Gateway service
 ├── AcctAtlas-user-service/            # User management and authentication
 ├── AcctAtlas-video-service/           # Video metadata and management
@@ -16,6 +21,8 @@ AccountabilityAtlas/
 ├── AcctAtlas-notification-service/    # User notifications
 └── AcctAtlas-web-app/                 # Frontend web application
 ```
+
+Service subdirectories are independent git repositories (excluded via `.gitignore`).
 
 ## Core Features
 

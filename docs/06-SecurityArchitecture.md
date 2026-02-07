@@ -34,19 +34,15 @@
 {
   "header": {
     "alg": "RS256",
-    "typ": "JWT",
-    "kid": "key-rotation-id"
+    "typ": "JWT"
   },
   "payload": {
     "sub": "user-uuid",
     "email": "user@example.com",
-    "name": "Display Name",
-    "tier": "TRUSTED",
-    "roles": ["USER", "CONTRIBUTOR"],
+    "trustTier": "TRUSTED",
+    "sessionId": "session-uuid",
     "iat": 1704067200,
-    "exp": 1704070800,
-    "iss": "accountabilityatlas.com",
-    "aud": "accountabilityatlas-api"
+    "exp": 1704068100
   }
 }
 ```
@@ -55,7 +51,7 @@
 
 | Token Type | Lifetime | Storage | Refresh |
 |------------|----------|---------|---------|
-| Access Token | 1 hour | Client memory | Via refresh token |
+| Access Token | 15 minutes | Client memory | Via refresh token |
 | Refresh Token | 7 days | HTTP-only cookie | Rotation on use |
 | Password Reset | 1 hour | Not stored (hash in DB) | One-time use |
 
@@ -66,7 +62,7 @@
 - At least one lowercase letter
 - At least one number
 - Password checked against common breach databases (HaveIBeenPwned API)
-- Argon2id hashing with recommended parameters
+- BCrypt hashing with cost factor 12
 
 ### OAuth 2.0 Integration
 

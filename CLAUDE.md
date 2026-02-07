@@ -1,25 +1,8 @@
 # Claude Code Context for AccountabilityAtlas
 
-## Project Overview
+See [README.md](README.md) for project overview and structure.
 
-AccountabilityAtlas is a multi-tier web application for geo-located video curation focused on constitutional rights audits. It consists of 7 microservices plus a frontend web application.
-
-## Project Structure
-
-This is a multi-repo project. The top-level repo contains project-wide configuration and architecture documentation, while each service subdirectory is its own independent git repository (excluded via `.gitignore`):
-
-```
-AccountabilityAtlas/                   # Top-level repo (config, README, CLAUDE.md, docs/)
-├── docs/                              # Architecture documentation
-├── AcctAtlas-api-gateway/             # Separate repo
-├── AcctAtlas-user-service/            # Separate repo
-├── AcctAtlas-video-service/           # Separate repo
-├── AcctAtlas-location-service/        # Separate repo
-├── AcctAtlas-search-service/          # Separate repo
-├── AcctAtlas-moderation-service/      # Separate repo
-├── AcctAtlas-notification-service/    # Separate repo
-└── AcctAtlas-web-app/                 # Separate repo
-```
+This is a **multi-repo project**: the top-level repo contains project-wide configuration and docs, while each service subdirectory is its own independent git repository (excluded via `.gitignore`).
 
 ## Key Documentation
 
@@ -47,7 +30,7 @@ See [08-DevelopmentStandards.md](docs/08-DevelopmentStandards.md) for:
 ### Common Workflows
 
 **Git workflow** (GitHub Flow):
-- `main` - always deployable (protected, requires PR approval)
+- `master` - always deployable (protected, requires PR approval)
 - `feature/{ticket}-{description}` or `fix/{ticket}-{description}` - all work branches from main
 
 **Commit messages**: Follow [Conventional Commits](https://www.conventionalcommits.org/). Include the GitHub issue number when applicable:
@@ -90,8 +73,12 @@ Each service has a `docs/technical.md` with:
 
 1. Changes to high-level architecture go in `docs/`
 2. Service-specific changes go in that service's repo
-3. Service repos must be committed/pushed separately from the top-level repo
+3. **Service repos must be committed/pushed separately from the top-level repo** - each service is its own git repository with its own commit history and PRs
 4. Keep domain models in sync between high-level docs and service docs
+
+## Environment Notes
+
+**Windows with Git Bash**: Use `/c/code/...` paths in bash commands, not `C:\code\...`. The Windows-style paths don't work in Git Bash/MSYS2.
 
 ## Delegating Work to Subagents
 

@@ -29,7 +29,8 @@ node_modules/
 
 # Logs
 *.log
-logs/
+logs/*
+!logs/.gitkeep
 
 # Test coverage
 coverage/

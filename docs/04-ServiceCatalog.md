@@ -4,14 +4,14 @@
 
 | Service | Port | Repository | Status |
 |---------|------|------------|--------|
-| api-gateway | 8080 | /AcctAtlas-api-gateway | Planned |
-| user-service | 8081 | /AcctAtlas-user-service | Planned |
+| api-gateway | 8080 | /AcctAtlas-api-gateway | In Progress |
+| user-service | 8081 | /AcctAtlas-user-service | In Progress |
 | video-service | 8082 | /AcctAtlas-video-service | Planned |
 | location-service | 8083 | /AcctAtlas-location-service | Planned |
 | search-service | 8084 | /AcctAtlas-search-service | Planned |
 | moderation-service | 8085 | /AcctAtlas-moderation-service | Planned |
 | notification-service | 8086 | /AcctAtlas-notification-service | Planned |
-| web-app | 3000 | /AcctAtlas-web-app | Planned |
+| web-app | 3000 | /AcctAtlas-web-app | In Progress |
 
 ---
 

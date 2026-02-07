@@ -1,0 +1,77 @@
+# Local development only - do not use these credentials in production
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres  # dev-only
+      POSTGRES_DB: accountabilityatlas
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  user-service:
+    image: acctatlas/user-service:latest
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_service
+      SPRING_DATASOURCE_USERNAME: user_service
+      SPRING_DATASOURCE_PASSWORD: local_dev  # dev-only
+      SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/user_service
+      SPRING_FLYWAY_USER: user_service
+      SPRING_FLYWAY_PASSWORD: local_dev  # dev-only
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles:
+      - backend
+
+  api-gateway:
+    image: acctatlas/api-gateway:latest
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      USER_SERVICE_URL: http://user-service:8081
+      # Uses custom placeholders in application.yml (not standard Spring binding)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      user-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles:
+      - backend
+
+volumes:
+  postgres_data:
