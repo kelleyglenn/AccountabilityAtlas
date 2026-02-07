@@ -171,6 +171,49 @@ kill_tree() {
     esac
 }
 
+# Get PID of process listening on a port (cross-platform)
+# Usage: get_pid_on_port <port>
+get_pid_on_port() {
+    local port=$1
+
+    case "$(uname -s)" in
+        MINGW*|CYGWIN*|MSYS*)
+            # Windows - use netstat
+            netstat -ano 2>/dev/null | grep ":$port " | grep "LISTENING" | awk '{print $5}' | head -1
+            ;;
+        *)
+            # Unix - use lsof
+            if command -v lsof &> /dev/null; then
+                lsof -t -i:$port 2>/dev/null | head -1
+            fi
+            ;;
+    esac
+}
+
+# Kill process on a specific port (cross-platform)
+# Usage: kill_process_on_port <port> [name]
+kill_process_on_port() {
+    local port=$1
+    local name=${2:-"process"}
+
+    local pid=$(get_pid_on_port $port)
+
+    if [ -n "$pid" ]; then
+        info "Killing $name on port $port (PID: $pid)..."
+        case "$(uname -s)" in
+            MINGW*|CYGWIN*|MSYS*)
+                # Windows - use taskkill with /T to kill process tree
+                taskkill //F //T //PID "$pid" 2>/dev/null || true
+                ;;
+            *)
+                # Unix - regular kill
+                kill -9 "$pid" 2>/dev/null || true
+                ;;
+        esac
+        success "Killed $name on port $port"
+    fi
+}
+
 # Check if docker-compose services are healthy
 # Usage: check_docker_healthy <service>
 check_docker_healthy() {

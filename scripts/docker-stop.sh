@@ -47,15 +47,7 @@ cd "$ROOT_DIR"
 if [ "$STOP_WEBAPP" = true ]; then
     info "Stopping Web App..."
     kill_saved_pid "web-app"
-
-    # Also kill any orphaned npm processes on port 3000
-    if command -v lsof &> /dev/null; then
-        WEB_PID=$(lsof -t -i:3000 2>/dev/null || true)
-        if [ -n "$WEB_PID" ]; then
-            info "Killing process on port 3000 (PID: $WEB_PID)"
-            kill $WEB_PID 2>/dev/null || true
-        fi
-    fi
+    kill_process_on_port 3000 "node"
 fi
 
 # Stop Docker services
@@ -79,13 +71,11 @@ echo ""
 # Show any remaining processes on key ports
 echo "Port status:"
 for port in 3000 5432 6379 8080 8081; do
-    if command -v lsof &> /dev/null; then
-        PID=$(lsof -t -i:$port 2>/dev/null || true)
-        if [ -n "$PID" ]; then
-            echo "  Port $port: PID $PID (still running)"
-        else
-            echo "  Port $port: free"
-        fi
+    PID=$(get_pid_on_port $port)
+    if [ -n "$PID" ]; then
+        echo "  Port $port: PID $PID (still running)"
+    else
+        echo "  Port $port: free"
     fi
 done
 echo ""

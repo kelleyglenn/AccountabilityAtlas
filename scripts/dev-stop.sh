@@ -44,14 +44,8 @@ cd "$ROOT_DIR"
 info "Stopping Web App..."
 kill_saved_pid "web-app"
 
-# Also kill any orphaned npm processes on port 3000
-if command -v lsof &> /dev/null; then
-    WEB_PID=$(lsof -t -i:3000 2>/dev/null || true)
-    if [ -n "$WEB_PID" ]; then
-        info "Killing process on port 3000 (PID: $WEB_PID)"
-        kill $WEB_PID 2>/dev/null || true
-    fi
-fi
+# Also kill any orphaned node processes on port 3000
+kill_process_on_port 3000 "node"
 
 # Stop API Gateway
 info "Stopping API Gateway..."
@@ -67,15 +61,8 @@ pkill -f "GradleDaemon.*AcctAtlas-user-service" 2>/dev/null || true
 pkill -f "GradleDaemon.*AcctAtlas-api-gateway" 2>/dev/null || true
 
 # Also try to kill Java processes on specific ports
-for port in 8080 8081; do
-    if command -v lsof &> /dev/null; then
-        JAVA_PID=$(lsof -t -i:$port 2>/dev/null || true)
-        if [ -n "$JAVA_PID" ]; then
-            info "Killing Java process on port $port (PID: $JAVA_PID)"
-            kill $JAVA_PID 2>/dev/null || true
-        fi
-    fi
-done
+kill_process_on_port 8080 "java"
+kill_process_on_port 8081 "java"
 
 # Stop Docker services
 if [ "$KEEP_DOCKER" = false ]; then
@@ -96,13 +83,11 @@ echo ""
 # Show any remaining processes on key ports
 echo "Port status:"
 for port in 3000 5432 6379 8080 8081; do
-    if command -v lsof &> /dev/null; then
-        PID=$(lsof -t -i:$port 2>/dev/null || true)
-        if [ -n "$PID" ]; then
-            echo "  Port $port: PID $PID (still running)"
-        else
-            echo "  Port $port: free"
-        fi
+    PID=$(get_pid_on_port $port)
+    if [ -n "$PID" ]; then
+        echo "  Port $port: PID $PID (still running)"
+    else
+        echo "  Port $port: free"
     fi
 done
 echo ""
