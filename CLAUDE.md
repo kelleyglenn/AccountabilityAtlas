@@ -38,6 +38,7 @@ See [08-DevelopmentStandards.md](docs/08-DevelopmentStandards.md) for:
 - All changes require a pull request with at least 1 approving review
 - Code owner reviews required
 - Always create a feature branch, open a PR, and merge via GitHub
+- *NEVER* commit directly to master, unless given explicit instructions to disable the protections first
 
 **Commit messages**: Follow [Conventional Commits](https://www.conventionalcommits.org/). Include the GitHub issue number when applicable:
 ```
@@ -61,13 +62,25 @@ docker-compose up -d postgres redis    # Start dependencies
 ./gradlew test                         # Run tests
 ```
 
-### Service-Specific Documentation
+### Service Repo Standards
 
-Each service has a `docs/technical.md` with:
-- Domain model
-- API endpoints
-- Events published/consumed
-- Local development setup
+Each service repo should follow the user-service template:
+
+**Required files:**
+- `README.md` - follows user-service format with Prerequisites, Clone/Build, Local Development, Docker Image, Project Structure, Key Gradle Tasks, Documentation sections
+- `docker-compose.yml` - standalone local dev stack (postgres/redis as needed, service with `profiles: [app]`)
+- `docs/technical.md` - domain model, API endpoints, events, local dev setup
+- `docs/database-schema.md` - JPA entity mappings, temporal vs non-temporal decisions, query patterns
+- `docs/api-specification.yaml` - OpenAPI 3.1 spec
+
+**Required Gradle tasks** (in Key Gradle Tasks table):
+- `bootRun` - run locally
+- `test` / `unitTest` / `integrationTest` - test tasks
+- `check` - full quality gate
+- `spotlessApply` - fix formatting
+- `jibDockerBuild` - build Docker image
+- `composeUp` - build image + docker-compose up
+- `composeDown` - stop docker-compose services
 
 ## Database Notes
 
