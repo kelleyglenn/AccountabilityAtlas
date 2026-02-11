@@ -22,6 +22,7 @@ This feature set creates the core map-based discovery experience for Accountabil
 | Service | Changes |
 |---------|---------|
 | **api-gateway** | Add routes for new services |
+| **user-service** | Add trust tier management API, user stats endpoint |
 | **web-app** | Map page, side panel, video detail page, submission form, moderation dashboard |
 
 ### Infrastructure Additions
@@ -173,6 +174,19 @@ Unauthorized access returns 404 (not 403) to avoid revealing video existence.
 | Moderator | Direct to Approved |
 | Trusted | Direct to Approved |
 | New | Status = Pending, added to moderation queue |
+
+### Trust Tier Changes
+
+Trust tiers can change automatically based on user behavior:
+
+| Direction | Trigger | Criteria |
+|-----------|---------|----------|
+| Promotion (NEW → TRUSTED) | After video approved | 30+ days old, 10+ approvals, 0 rejections (30d), 0 active reports |
+| Demotion (TRUSTED → NEW) | After video rejected | 3+ rejections (30d) OR 3+ active abuse reports |
+
+Admins can also manually adjust trust tiers via user-service API.
+
+See [moderation-service design](2026-02-09-moderation-service-design.md) for implementation details.
 
 ### Validation
 
@@ -340,6 +354,13 @@ Denormalized view in PostgreSQL FTS (Phase 1), combining video + location data. 
 | POST | /moderation/queue/{id}/approve | Mod/Admin | Approve content |
 | POST | /moderation/queue/{id}/reject | Mod/Admin | Reject with reason |
 
+### user-service (updates for trust tiers)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| PUT | /users/{id}/trust-tier | Admin | Manually set user's trust tier |
+| GET | /users/{id}/stats | Internal | Get user stats (approved count, etc.) |
+
 All endpoints prefixed with `/api/v1` at the gateway.
 
 ---
@@ -357,6 +378,7 @@ All endpoints prefixed with `/api/v1` at the gateway.
 |-------|-----------|-----------|
 | video-events | video-service | moderation-service, search-service |
 | moderation-events | moderation-service | video-service, search-service |
+| user-events | user-service | moderation-service |
 
 ### Event Definitions
 
@@ -396,6 +418,18 @@ All endpoints prefixed with `/api/v1` at the gateway.
 }
 ```
 
+**UserTrustTierChanged** (user-service)
+```json
+{
+  "eventType": "UserTrustTierChanged",
+  "userId": "uuid",
+  "oldTier": "NEW|TRUSTED|MODERATOR|ADMIN",
+  "newTier": "NEW|TRUSTED|MODERATOR|ADMIN",
+  "reason": "AUTO_PROMOTION|AUTO_DEMOTION|MANUAL",
+  "timestamp": "ISO8601"
+}
+```
+
 ### Event Flows
 
 **New User Submission:**
@@ -415,6 +449,17 @@ All endpoints prefixed with `/api/v1` at the gateway.
 1. moderation-service publishes VideoRejected
 2. video-service updates status to REJECTED
 3. search-service removes from index (if present)
+
+**Trust Tier Promotion:**
+1. moderation-service detects user meets promotion criteria (after VideoApproved)
+2. moderation-service calls user-service API to update trust tier
+3. user-service updates tier, publishes UserTrustTierChanged
+4. moderation-service consumes event, re-evaluates any pending items from user
+
+**Trust Tier Demotion:**
+1. moderation-service detects user meets demotion criteria (after VideoRejected)
+2. moderation-service calls user-service API to update trust tier
+3. user-service updates tier, publishes UserTrustTierChanged
 
 ---
 
@@ -449,6 +494,8 @@ All endpoints prefixed with `/api/v1` at the gateway.
 | Access control | Pending video returns 404 for anonymous user |
 | Submission | Submit video via form, verify appears in queue or map |
 | Moderation | Approve video → appears in search, reject → removed |
+| Trust promotion | NEW user with 10 approvals after 30 days → becomes TRUSTED |
+| Trust demotion | TRUSTED user with 3 rejections → becomes NEW, videos require moderation |
 
 ### Playwright + Mapbox
 
@@ -513,3 +560,4 @@ All endpoints prefixed with `/api/v1` at the gateway.
 | Server-side clustering | Scales better than client-side for large datasets |
 | Search-service for all filtered queries | Unified query interface, denormalized for performance |
 | YouTube metadata fetched once at submission | Avoids rate limits, ensures consistency, reduces latency on reads |
+| Auto-demotion + manual override | Automatic demotion on repeated violations; admins can manually adjust for appeals/edge cases |
