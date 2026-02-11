@@ -101,6 +101,35 @@ services:
     profiles:
       - backend
 
+  search-service:
+    image: acctatlas/search-service:latest
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/search_service
+      SPRING_DATASOURCE_USERNAME: search_service
+      SPRING_DATASOURCE_PASSWORD: local_dev  # dev-only
+      SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/search_service
+      SPRING_FLYWAY_USER: search_service
+      SPRING_FLYWAY_PASSWORD: local_dev  # dev-only
+      SPRING_CLOUD_AWS_SQS_ENDPOINT: http://localstack:4566
+      SPRING_CLOUD_AWS_REGION_STATIC: us-east-1
+      VIDEO_SERVICE_URL: http://video-service:8082
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    profiles:
+      - backend
+
   api-gateway:
     image: acctatlas/api-gateway:latest
     ports:
@@ -108,6 +137,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       USER_SERVICE_URL: http://user-service:8081
+      SEARCH_SERVICE_URL: http://search-service:8084
       # Uses custom placeholders in application.yml (not standard Spring binding)
       REDIS_HOST: redis
       REDIS_PORT: 6379

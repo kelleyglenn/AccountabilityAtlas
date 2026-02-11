@@ -20,3 +20,11 @@ GRANT ALL PRIVILEGES ON DATABASE location_service TO location_service;
 \c location_service
 CREATE EXTENSION IF NOT EXISTS postgis;
 GRANT ALL ON SCHEMA public TO location_service;
+
+-- Search Service database
+CREATE USER search_service WITH PASSWORD 'local_dev';  -- dev-only password
+CREATE DATABASE search_service OWNER search_service;
+GRANT ALL PRIVILEGES ON DATABASE search_service TO search_service;
+
+\c search_service
+GRANT ALL ON SCHEMA public TO search_service;
