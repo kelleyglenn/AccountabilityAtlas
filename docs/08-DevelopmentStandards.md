@@ -588,6 +588,14 @@ Unit tests should follow the **Arrange-Act-Assert (AAA)** pattern with comments 
 
 Always include `// Arrange`, `// Act`, `// Assert` comments to clearly delineate each phase.
 
+### Unit Test Naming
+
+Use the strict naming convention:
+
+`<method>_<condition>_<expectedBehavior>`
+
+Example: `submitVideo_newUser_createsPendingVideo`
+
 ### Unit Test Example
 
 ```java
