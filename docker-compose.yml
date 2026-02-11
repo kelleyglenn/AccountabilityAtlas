@@ -58,6 +58,8 @@ services:
       SPRING_FLYWAY_PASSWORD: local_dev  # dev-only
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      AWS_SQS_ENDPOINT: http://localstack:4566
+      AWS_REGION: us-east-1
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/actuator/health"]
       interval: 10s
@@ -68,6 +70,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      localstack:
         condition: service_healthy
     profiles:
       - backend
