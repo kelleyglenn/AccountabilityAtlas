@@ -40,6 +40,13 @@ Service subdirectories are independent git repositories (excluded via `.gitignor
 
 See [docs/](docs/) for complete architecture and design documentation.
 
+## Prerequisites
+
+- **Docker Desktop** (for PostgreSQL, Redis, LocalStack)
+- **Git**
+
+JDK 21 is managed automatically by the Gradle wrapper via [Foojay Toolchain](https://github.com/gradle/foojay-toolchain) -- no manual JDK installation required.
+
 ## Local Development
 
 Two startup modes are available:
@@ -52,15 +59,31 @@ Two startup modes are available:
 
 **Docker Mode** (production-like):
 ```bash
-# First, build Docker images for Java services
-cd AcctAtlas-user-service && ./gradlew jibDockerBuild && cd ..
-cd AcctAtlas-api-gateway && ./gradlew jibDockerBuild && cd ..
+# Build Docker images for all services
+./gradlew jibDockerBuildAll
 
 ./scripts/docker-start.sh   # Starts all backend services in containers
 ./scripts/docker-stop.sh    # Stops containers
 ```
 
 Both modes start all services and open a browser to http://localhost:3000.
+
+## Key Gradle Tasks
+
+Top-level orchestration tasks that run across all service repositories:
+
+| Task | Description |
+|------|-------------|
+| `jibDockerBuildAll` | Build Docker images for all services |
+| `cleanAll` | Run clean in all services |
+| `checkAll` | Run check (tests + quality gates) in all services |
+| `testAll` | Run tests in all services |
+| `spotlessApplyAll` | Apply code formatting in all services |
+| `spotlessCheckAll` | Check code formatting in all services |
+
+You can also target individual services (e.g., `./gradlew jibDockerBuild_AcctAtlas-user-service`).
+
+Each service has its own Gradle build with service-specific tasks. See individual service READMEs for details.
 
 ## Git and GitHub
 

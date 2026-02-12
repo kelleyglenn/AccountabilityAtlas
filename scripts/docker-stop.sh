@@ -52,7 +52,7 @@ echo ""
 
 # Show any remaining processes on key ports
 echo "Port status:"
-for port in 3000 5432 6379 8080 8081; do
+for port in 3000 4566 5432 6379 8080 8081 8082 8083 8084 8085; do
     PID=$(get_pid_on_port $port)
     if [ -n "$PID" ]; then
         echo "  Port $port: PID $PID (still running)"
