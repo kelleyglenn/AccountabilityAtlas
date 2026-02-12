@@ -28,18 +28,21 @@ A Flyway-based dev seed data system that populates PostgreSQL with test users, v
 AcctAtlas-user-service/
 └── src/main/resources/
     ├── application-local.yml           # Add devdata location
+    ├── application-docker.yml          # Add devdata location
     └── db/devdata/
         └── R__dev_seed_users.sql       # 4 test users
 
 AcctAtlas-video-service/
 └── src/main/resources/
     ├── application-local.yml           # Add devdata location
+    ├── application-docker.yml          # Add devdata location
     └── db/devdata/
         └── R__dev_seed_videos.sql      # 10 videos + amendments/participants
 
 AcctAtlas-location-service/
 └── src/main/resources/
     ├── application-local.yml           # Add devdata location
+    ├── application-docker.yml          # Add devdata location
     └── db/devdata/
         └── R__dev_seed_locations.sql   # 10 locations + video_locations links
 ```
@@ -48,7 +51,7 @@ AcctAtlas-location-service/
 
 ## Profile Gating
 
-Add to each service's `application-local.yml`:
+Add to each service's `application-local.yml` **AND** `application-docker.yml`:
 
 ```yaml
 spring:
@@ -58,7 +61,10 @@ spring:
       - classpath:db/devdata
 ```
 
-This ensures dev seed data **only runs with the local profile**, never in production.
+Both `local` (IDE/bootRun) and `docker` (docker-compose) are development environments, so both should load seed data. This ensures:
+- Dev seed data loads when running via `./gradlew bootRun` (local profile)
+- Dev seed data loads when running via `docker-compose` (docker profile)
+- Dev seed data **never runs in production** (no devdata location configured)
 
 ---
 
@@ -182,10 +188,14 @@ Or open map page at `http://localhost:3000/map` and verify markers appear.
 ## Implementation Checklist
 
 - [ ] Create `db/devdata/R__dev_seed_users.sql` in user-service
-- [ ] Update `application-local.yml` in user-service
+- [ ] Update `application-local.yml` in user-service (add devdata location)
+- [ ] Update `application-docker.yml` in user-service (add devdata location)
 - [ ] Create `db/devdata/R__dev_seed_videos.sql` in video-service
-- [ ] Update `application-local.yml` in video-service
+- [ ] Update `application-local.yml` in video-service (add devdata location)
+- [ ] Update `application-docker.yml` in video-service (add devdata location)
 - [ ] Create `db/devdata/R__dev_seed_locations.sql` in location-service
-- [ ] Update `application-local.yml` in location-service
+- [ ] Update `application-local.yml` in location-service (add devdata location)
+- [ ] Update `application-docker.yml` in location-service (add devdata location)
+- [ ] Test with `./gradlew bootRun` and verify data loads
 - [ ] Test with `docker-compose up` and verify data loads
 - [ ] Verify map page shows markers
