@@ -3,12 +3,13 @@
 # Docker Mode Startup Script
 #
 # Starts all services via Docker containers:
-#   - PostgreSQL, Redis, User Service, API Gateway, Web App via docker-compose
+#   - PostgreSQL, Redis, LocalStack (infrastructure)
+#   - User Service, Location Service, Video Service, Search Service, Moderation Service
+#   - API Gateway, Web App
 #
 # Prerequisites:
 #   - Java service images must be built first:
-#     cd AcctAtlas-user-service && ./gradlew jibDockerBuild && cd ..
-#     cd AcctAtlas-api-gateway && ./gradlew jibDockerBuild && cd ..
+#     ./gradlew jibDockerBuildAll
 #   - Web App image is built automatically by docker-compose
 #
 # Usage:
@@ -34,37 +35,35 @@ cd "$ROOT_DIR"
 # Step 1: Check if Docker images exist
 info "Checking for Docker images..."
 
-IMAGES_MISSING=false
-if ! docker image inspect acctatlas/user-service:latest > /dev/null 2>&1; then
-    warn "Image acctatlas/user-service:latest not found"
-    IMAGES_MISSING=true
-fi
+REQUIRED_IMAGES=(
+    "acctatlas/user-service:latest"
+    "acctatlas/location-service:latest"
+    "acctatlas/video-service:latest"
+    "acctatlas/search-service:latest"
+    "acctatlas/moderation-service:latest"
+    "acctatlas/api-gateway:latest"
+)
 
-if ! docker image inspect acctatlas/api-gateway:latest > /dev/null 2>&1; then
-    warn "Image acctatlas/api-gateway:latest not found"
-    IMAGES_MISSING=true
-fi
+IMAGES_MISSING=false
+for image in "${REQUIRED_IMAGES[@]}"; do
+    if ! docker image inspect "$image" > /dev/null 2>&1; then
+        warn "Image $image not found"
+        IMAGES_MISSING=true
+    fi
+done
 
 if [ "$IMAGES_MISSING" = true ]; then
     echo ""
     warn "Docker images are missing. Build them with:"
     echo ""
-    echo "  cd AcctAtlas-user-service && ./gradlew jibDockerBuild && cd .."
-    echo "  cd AcctAtlas-api-gateway && ./gradlew jibDockerBuild && cd .."
+    echo "  ./gradlew jibDockerBuildAll"
     echo ""
     read -p "Would you like to build them now? [y/N] " -n 1 -r
     echo ""
 
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        info "Building user-service image..."
-        cd "$ROOT_DIR/AcctAtlas-user-service"
-        ./gradlew jibDockerBuild
-
-        info "Building api-gateway image..."
-        cd "$ROOT_DIR/AcctAtlas-api-gateway"
-        ./gradlew jibDockerBuild
-
-        cd "$ROOT_DIR"
+        info "Building all service images..."
+        ./gradlew jibDockerBuildAll
         success "Docker images built successfully"
     else
         error "Cannot start without Docker images. Please build them first."
@@ -76,25 +75,38 @@ fi
 info "Starting all services via docker-compose..."
 docker-compose --profile backend --profile frontend up -d
 
-# Step 3: Wait for services to be healthy
+# Step 3: Wait for infrastructure to be healthy
 wait_for_docker_healthy postgres 30
 wait_for_docker_healthy redis 15
+wait_for_docker_healthy localstack 30
 
-# Wait for the Java services (they depend on postgres/redis)
-info "Waiting for User Service container to be ready..."
+# Step 4: Wait for Java services (they depend on infrastructure)
+info "Waiting for User Service to be ready..."
 wait_for_health "http://localhost:8081/actuator/health" "User Service" 60 3
 
-info "Waiting for API Gateway container to be ready..."
+info "Waiting for Location Service to be ready..."
+wait_for_health "http://localhost:8083/actuator/health" "Location Service" 60 3
+
+info "Waiting for Video Service to be ready..."
+wait_for_health "http://localhost:8082/actuator/health" "Video Service" 60 3
+
+info "Waiting for Search Service to be ready..."
+wait_for_health "http://localhost:8084/actuator/health" "Search Service" 60 3
+
+info "Waiting for Moderation Service to be ready..."
+wait_for_health "http://localhost:8085/actuator/health" "Moderation Service" 60 3
+
+info "Waiting for API Gateway to be ready..."
 wait_for_health "http://localhost:8080/actuator/health" "API Gateway" 60 3
 
-# Step 4: Wait for Web App to be ready
-info "Waiting for Web App container to be ready..."
+# Step 5: Wait for Web App to be ready
+info "Waiting for Web App to be ready..."
 wait_for_health "http://localhost:3000" "Web App" 60 3
 
-# Step 5: Open browser
+# Step 6: Open browser
 open_browser "http://localhost:3000"
 
-# Step 6: Print status
+# Step 7: Print status
 print_status
 
 echo "Docker containers:"

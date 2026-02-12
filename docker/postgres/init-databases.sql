@@ -28,3 +28,19 @@ GRANT ALL PRIVILEGES ON DATABASE search_service TO search_service;
 
 \c search_service
 GRANT ALL ON SCHEMA public TO search_service;
+
+-- Video Service database
+CREATE USER video_service WITH PASSWORD 'local_dev';  -- dev-only password
+CREATE DATABASE video_service OWNER video_service;
+GRANT ALL PRIVILEGES ON DATABASE video_service TO video_service;
+
+\c video_service
+GRANT ALL ON SCHEMA public TO video_service;
+
+-- Moderation Service database
+CREATE USER moderation_service WITH PASSWORD 'local_dev';  -- dev-only password
+CREATE DATABASE moderation_service OWNER moderation_service;
+GRANT ALL PRIVILEGES ON DATABASE moderation_service TO moderation_service;
+
+\c moderation_service
+GRANT ALL ON SCHEMA public TO moderation_service;
