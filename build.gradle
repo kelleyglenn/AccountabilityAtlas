@@ -1,0 +1,130 @@
+/**
+ * Top-level build orchestration for AccountabilityAtlas.
+ *
+ * This build file provides tasks that run across all service repositories.
+ * Each service remains an independent Gradle project with its own build.
+ *
+ * Uses Exec tasks to invoke each service's gradlew directly, avoiding
+ * Gradle composite build conflicts.
+ */
+
+def services = [
+    'AcctAtlas-api-gateway',
+    'AcctAtlas-location-service',
+    'AcctAtlas-moderation-service',
+    'AcctAtlas-search-service',
+    'AcctAtlas-user-service',
+    'AcctAtlas-video-service',
+]
+
+def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+
+// ---- Register individual service tasks ----
+
+services.each { service ->
+    def serviceDir = file(service)
+
+    tasks.register("jibDockerBuild_${service}", Exec) {
+        group = 'docker'
+        description = "Build Docker image for ${service}"
+        workingDir = serviceDir
+        if (isWindows) {
+            commandLine 'cmd', '/c', "${serviceDir.absolutePath}\\gradlew.bat", 'jibDockerBuild'
+        } else {
+            commandLine './gradlew', 'jibDockerBuild'
+        }
+    }
+
+    tasks.register("clean_${service}", Exec) {
+        group = 'build'
+        description = "Clean ${service}"
+        workingDir = serviceDir
+        if (isWindows) {
+            commandLine 'cmd', '/c', "${serviceDir.absolutePath}\\gradlew.bat", 'clean'
+        } else {
+            commandLine './gradlew', 'clean'
+        }
+    }
+
+    tasks.register("check_${service}", Exec) {
+        group = 'verification'
+        description = "Run check in ${service}"
+        workingDir = serviceDir
+        if (isWindows) {
+            commandLine 'cmd', '/c', "${serviceDir.absolutePath}\\gradlew.bat", 'check'
+        } else {
+            commandLine './gradlew', 'check'
+        }
+    }
+
+    tasks.register("test_${service}", Exec) {
+        group = 'verification'
+        description = "Run tests in ${service}"
+        workingDir = serviceDir
+        if (isWindows) {
+            commandLine 'cmd', '/c', "${serviceDir.absolutePath}\\gradlew.bat", 'test'
+        } else {
+            commandLine './gradlew', 'test'
+        }
+    }
+
+    tasks.register("spotlessApply_${service}", Exec) {
+        group = 'formatting'
+        description = "Apply formatting in ${service}"
+        workingDir = serviceDir
+        if (isWindows) {
+            commandLine 'cmd', '/c', "${serviceDir.absolutePath}\\gradlew.bat", 'spotlessApply'
+        } else {
+            commandLine './gradlew', 'spotlessApply'
+        }
+    }
+
+    tasks.register("spotlessCheck_${service}", Exec) {
+        group = 'formatting'
+        description = "Check formatting in ${service}"
+        workingDir = serviceDir
+        if (isWindows) {
+            commandLine 'cmd', '/c', "${serviceDir.absolutePath}\\gradlew.bat", 'spotlessCheck'
+        } else {
+            commandLine './gradlew', 'spotlessCheck'
+        }
+    }
+}
+
+// ---- Aggregate tasks ----
+
+tasks.register('jibDockerBuildAll') {
+    group = 'docker'
+    description = 'Build Docker images for all services using Jib'
+    dependsOn services.collect { "jibDockerBuild_${it}" }
+}
+
+tasks.register('cleanAll') {
+    group = 'build'
+    description = 'Run clean in all services'
+    dependsOn services.collect { "clean_${it}" }
+}
+
+tasks.register('checkAll') {
+    group = 'verification'
+    description = 'Run check (tests + quality gates) in all services'
+    dependsOn services.collect { "check_${it}" }
+}
+
+tasks.register('testAll') {
+    group = 'verification'
+    description = 'Run tests in all services'
+    dependsOn services.collect { "test_${it}" }
+}
+
+tasks.register('spotlessApplyAll') {
+    group = 'formatting'
+    description = 'Apply code formatting in all services'
+    dependsOn services.collect { "spotlessApply_${it}" }
+}
+
+tasks.register('spotlessCheckAll') {
+    group = 'formatting'
+    description = 'Check code formatting in all services'
+    dependsOn services.collect { "spotlessCheck_${it}" }
+}
