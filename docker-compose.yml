@@ -127,6 +127,69 @@ services:
         condition: service_healthy
       localstack:
         condition: service_healthy
+      video-service:
+        condition: service_healthy
+    profiles:
+      - backend
+
+  video-service:
+    image: acctatlas/video-service:latest
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/video_service
+      SPRING_DATASOURCE_USERNAME: video_service
+      SPRING_DATASOURCE_PASSWORD: local_dev  # dev-only
+      SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/video_service
+      SPRING_FLYWAY_USER: video_service
+      SPRING_FLYWAY_PASSWORD: local_dev  # dev-only
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_CLOUD_AWS_SQS_ENDPOINT: http://localstack:4566
+      SPRING_CLOUD_AWS_REGION_STATIC: us-east-1
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    profiles:
+      - backend
+
+  moderation-service:
+    image: acctatlas/moderation-service:latest
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/moderation_service
+      SPRING_DATASOURCE_USERNAME: moderation_service
+      SPRING_DATASOURCE_PASSWORD: local_dev  # dev-only
+      SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/moderation_service
+      SPRING_FLYWAY_USER: moderation_service
+      SPRING_FLYWAY_PASSWORD: local_dev  # dev-only
+      SPRING_CLOUD_AWS_SQS_ENDPOINT: http://localstack:4566
+      SPRING_CLOUD_AWS_REGION_STATIC: us-east-1
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8085/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
     profiles:
       - backend
 
