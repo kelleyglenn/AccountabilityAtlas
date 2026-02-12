@@ -200,7 +200,10 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       USER_SERVICE_URL: http://user-service:8081
+      VIDEO_SERVICE_URL: http://video-service:8082
+      LOCATION_SERVICE_URL: http://location-service:8083
       SEARCH_SERVICE_URL: http://search-service:8084
+      MODERATION_SERVICE_URL: http://moderation-service:8085
       # Uses custom placeholders in application.yml (not standard Spring binding)
       REDIS_HOST: redis
       REDIS_PORT: 6379
