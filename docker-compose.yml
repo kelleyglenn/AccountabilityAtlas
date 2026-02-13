@@ -207,8 +207,22 @@ services:
       # Uses custom placeholders in application.yml (not standard Spring binding)
       REDIS_HOST: redis
       REDIS_PORT: 6379
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       user-service:
+        condition: service_healthy
+      video-service:
+        condition: service_healthy
+      location-service:
+        condition: service_healthy
+      search-service:
+        condition: service_healthy
+      moderation-service:
         condition: service_healthy
       redis:
         condition: service_healthy
