@@ -45,7 +45,17 @@ AcctAtlas-location-service/
     ├── application-docker.yml          # Add devdata location
     └── db/devdata/
         └── R__dev_seed_locations.sql   # 10 locations + video_locations links
+
+AcctAtlas-search-service/
+└── src/main/resources/
+    ├── application-local.yml           # Add devdata location
+    ├── application-docker.yml          # Add devdata location
+    └── db/devdata/
+        └── R__dev_seed_search_videos.sql  # 10 videos (denormalized for search)
 ```
+
+> **Note:** search-service requires its own seed data because it normally receives
+> video data via SQS events. Direct seeding bypasses the event flow.
 
 ---
 
@@ -187,15 +197,17 @@ Or open map page at `http://localhost:3000/map` and verify markers appear.
 
 ## Implementation Checklist
 
-- [ ] Create `db/devdata/R__dev_seed_users.sql` in user-service
-- [ ] Update `application-local.yml` in user-service (add devdata location)
-- [ ] Update `application-docker.yml` in user-service (add devdata location)
-- [ ] Create `db/devdata/R__dev_seed_videos.sql` in video-service
-- [ ] Update `application-local.yml` in video-service (add devdata location)
-- [ ] Update `application-docker.yml` in video-service (add devdata location)
-- [ ] Create `db/devdata/R__dev_seed_locations.sql` in location-service
-- [ ] Update `application-local.yml` in location-service (add devdata location)
-- [ ] Update `application-docker.yml` in location-service (add devdata location)
-- [ ] Test with `./gradlew bootRun` and verify data loads
-- [ ] Test with `docker-compose up` and verify data loads
+- [x] Create `db/devdata/R__dev_seed_users.sql` in user-service
+- [x] Update `application-local.yml` in user-service (add devdata location)
+- [x] Update `application-docker.yml` in user-service (add devdata location)
+- [x] Create `db/devdata/R__dev_seed_videos.sql` in video-service
+- [x] Update `application-local.yml` in video-service (add devdata location)
+- [x] Update `application-docker.yml` in video-service (add devdata location)
+- [x] Create `db/devdata/R__dev_seed_locations.sql` in location-service
+- [x] Update `application-local.yml` in location-service (add devdata location)
+- [x] Update `application-docker.yml` in location-service (add devdata location)
+- [x] Create `db/devdata/R__dev_seed_search_videos.sql` in search-service
+- [x] Update `application-local.yml` in search-service (add devdata location)
+- [x] Update `application-docker.yml` in search-service (add devdata location)
+- [ ] Merge PRs and test with `docker-compose up`
 - [ ] Verify map page shows markers
