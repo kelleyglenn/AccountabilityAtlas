@@ -47,6 +47,25 @@
 }
 ```
 
+### Cross-Service Token Validation (JWKS)
+
+The user-service is the sole JWT issuer. It exposes the RSA public key at `GET /.well-known/jwks.json` using the standard [JWK Set](https://datatracker.ietf.org/doc/html/rfc7517) format.
+
+Downstream services validate tokens by configuring Spring's OAuth2 Resource Server:
+
+```yaml
+spring.security.oauth2.resourceserver.jwt.jwk-set-uri: http://user-service:8081/.well-known/jwks.json
+```
+
+| Service | JWT Role | Configuration |
+|---------|----------|---------------|
+| user-service | **Issuer** | Signs tokens with RSA private key; exposes public key via JWKS |
+| video-service | **Validator** | Fetches JWKS from user-service; decodes Bearer tokens |
+| moderation-service | **Validator** | Fetches JWKS from user-service; enforces role-based access |
+| api-gateway | **Passthrough** (local dev) | Forwards Bearer tokens without validation (`app.jwt.passthrough=true`) |
+
+**Production note:** The current RSA key pair is generated dynamically at startup. For production, keys will be loaded from AWS Secrets Manager with rotation support. See [10-FutureFeatures.md](10-FutureFeatures.md#pre-production-requirements).
+
 ### Token Lifecycle
 
 | Token Type | Lifetime | Storage | Refresh |

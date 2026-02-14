@@ -34,7 +34,7 @@ See [ChatGPT suggestions](https://chatgpt.com/s/t_6982deeabf6c8191b7753430621ec4
 
 These items use temporary workarounds in local development and must be addressed before going live:
 
-1. **Shared JWT signing keys**: Currently, the API Gateway and User Service generate their own RSA key pairs at startup. In local dev, the gateway uses "passthrough mode" (`app.jwt.passthrough=true`) to let downstream services handle auth. For production, services must share signing keys via AWS Secrets Manager or similar. See [06-SecurityArchitecture.md](06-SecurityArchitecture.md#secrets-management) for the planned approach.
+1. **Stable JWT signing keys**: The user-service generates an RSA key pair at startup and exposes the public key via a JWKS endpoint (`/.well-known/jwks.json`). Downstream services (video-service, moderation-service) fetch this key to validate tokens. This works for local dev but the dynamic key pair means restarting user-service invalidates all existing tokens. For production, load the key pair from AWS Secrets Manager with rotation and `kid` header support. The API Gateway still generates its own separate key pair and uses passthrough mode (`app.jwt.passthrough=true`) in local dev. See [06-SecurityArchitecture.md](06-SecurityArchitecture.md#cross-service-token-validation-jwks) for the current architecture.
 
 2. **Proper 401 responses**: Spring Security returns 403 (Forbidden) by default when authentication is missing. We've configured `AuthenticationEntryPoint` in user-service to return 401, but this pattern must be applied consistently across all services that require authentication.
 
