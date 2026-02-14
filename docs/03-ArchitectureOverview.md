@@ -16,8 +16,8 @@ AccountabilityAtlas follows a **microservices architecture** with the following 
 │                              EXTERNAL SYSTEMS                                │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │   YouTube    │  │ Google Maps  │  │    OAuth     │  │    Email     │     │
-│  │   Data API   │  │   Platform   │  │  Providers   │  │   Service    │     │
+│  │   YouTube    │  │   Mapbox     │  │    OAuth     │  │    Email     │     │
+│  │   Data API   │  │  Platform    │  │  Providers   │  │   Service    │     │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │

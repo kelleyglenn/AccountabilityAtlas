@@ -14,7 +14,7 @@ AccountabilityAtlas is a geo-located video curation platform focused on constitu
 ## Core Features
 
 ### Map-Based Video Discovery
-- Interactive Google Maps integration displaying thousands of geo-located YouTube videos
+- Interactive Mapbox integration displaying thousands of geo-located YouTube videos
 - Clustering for high-density areas
 - Pan, zoom, and location-based browsing
 - Video preview on marker selection

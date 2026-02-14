@@ -123,7 +123,7 @@ Security controls scale with deployment phase:
 ### External Services
 | Service | Purpose | Integration Type |
 |---------|---------|------------------|
-| Google Maps Platform | Map display, geocoding | JavaScript SDK, REST API |
+| Mapbox | Map display, geocoding, places autocomplete | Mapbox GL JS SDK, REST API |
 | YouTube Data API | Video metadata, thumbnails, validation | REST API |
 | Amazon SES | Transactional email | REST API |
 | OAuth Providers | Google, Apple login | OAuth 2.0/OIDC |

@@ -6,10 +6,10 @@
 |---------|------|------------|--------|
 | api-gateway | 8080 | /AcctAtlas-api-gateway | In Progress |
 | user-service | 8081 | /AcctAtlas-user-service | In Progress |
-| video-service | 8082 | /AcctAtlas-video-service | Planned |
-| location-service | 8083 | /AcctAtlas-location-service | Planned |
-| search-service | 8084 | /AcctAtlas-search-service | Planned |
-| moderation-service | 8085 | /AcctAtlas-moderation-service | Planned |
+| video-service | 8082 | /AcctAtlas-video-service | In Progress |
+| location-service | 8083 | /AcctAtlas-location-service | In Progress |
+| search-service | 8084 | /AcctAtlas-search-service | In Progress |
+| moderation-service | 8085 | /AcctAtlas-moderation-service | In Progress |
 | notification-service | 8086 | /AcctAtlas-notification-service | Planned |
 | web-app | 3000 | /AcctAtlas-web-app | In Progress |
 
@@ -275,7 +275,7 @@ LocationStats (separate table — counters change frequently, not temporal)
 ### Dependencies
 - PostgreSQL + PostGIS (spatial data)
 - Redis (cluster caching)
-- Google Maps Geocoding API
+- Mapbox Geocoding API
 
 ---
 
