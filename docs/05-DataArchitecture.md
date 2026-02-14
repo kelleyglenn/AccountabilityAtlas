@@ -685,7 +685,7 @@ Value: {
 }
 TTL: 2592000 (30 days)
 
-Note: Geocoding results rarely change; long TTL reduces Google Maps API costs.
+Note: Geocoding results rarely change; long TTL reduces Mapbox API costs.
 ```
 
 **Reverse Geocoding Cache**

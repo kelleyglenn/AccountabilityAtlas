@@ -16,7 +16,7 @@ This document provides monthly cost estimates for AccountabilityAtlas infrastruc
 | 2 | Growth | ~$525 | ECS Fargate + ALB + ElastiCache |
 | 3 | Scale | ~$2,335 (+ ~$570 staging) | OpenSearch + WAF + Multi-AZ |
 | 4 | Full Prod | ~$2,370 (+ ~$570 staging) | Auto-scaling + DR (~$1,825 with RI) |
-| — | External APIs | ~$25 | Google Maps (all phases) |
+| — | External APIs | ~$0 | Mapbox free tier (all phases) |
 
 *All phase estimates include 20% buffer except Phase 1 (exact pricing). See each phase section for detailed breakdowns.*
 
@@ -77,17 +77,17 @@ This document provides monthly cost estimates for AccountabilityAtlas infrastruc
 
 ## External API Costs
 
-### Google Maps Platform
+### Mapbox
 
 | API | Free Tier | Unit Price | Estimated Monthly Usage | Cost |
 |-----|-----------|------------|-------------------------|------|
-| Maps JavaScript | $200 credit | $7.00/1K loads | 10K loads | $70 - $200 credit = $0 |
-| Geocoding | $200 credit | $5.00/1K requests | 5K requests | $25 |
-| Places Autocomplete | $200 credit | $2.83/1K requests | 2K requests | $6 |
+| Map Loads (Mapbox GL JS) | 50K/month free | $5.00/1K loads | 10K loads | $0 (within free tier) |
+| Geocoding (forward + reverse) | 100K/month free | $0.75/1K requests | 5K requests | $0 (within free tier) |
+| Search Box sessions | 1K/month free | $0.10/session | 500 sessions | $0 (within free tier) |
 
-**Note**: Google provides $200/month free credit. Light usage stays within free tier.
+**Note**: Mapbox provides generous free tiers. At current usage levels, all map-related API costs are $0/month. Costs only begin when usage exceeds free tier thresholds.
 
-**Estimated**: ~$25/month
+**Estimated**: ~$0/month (Phase 1-2), review at Phase 3+ scale
 
 #### Caching Strategy (Implemented)
 
@@ -98,7 +98,7 @@ Per [05-DataArchitecture.md](05-DataArchitecture.md), external API responses are
 | `extapi:geocode:{hash}` | 30 days | Same address lookups hit cache, not API |
 | `extapi:reverse:{lat}:{lng}` | 30 days | Same coordinate lookups hit cache |
 
-**Impact**: Caching ensures API costs remain stable (~$25/month) even as user traffic increases significantly. Without caching, costs would scale linearly with usage and quickly exceed the free tier.
+**Impact**: Caching ensures API costs remain within free tiers even as user traffic increases significantly.
 
 ### YouTube Data API
 
@@ -217,12 +217,12 @@ Unchanged from Phase 3: **~$570/month**
 
 | Phase | Monthly | Annual | Notes |
 |-------|---------|--------|-------|
-| Phase 1 (Year 1) | ~$187 | ~$2,244 | Incl. ~$25 external APIs |
-| Phase 1 (After Year 1) | ~$204 | ~$2,448 | Incl. ~$25 external APIs |
-| Phase 2 | ~$550 | ~$6,600 | Incl. ~$25 external APIs |
-| Phase 3 | ~$2,930 | ~$35,160 | Prod + staging + APIs |
-| Phase 4 (On-Demand) | ~$2,965 | ~$35,580 | Prod + staging + APIs |
-| Phase 4 (Reserved) | ~$2,420 | ~$29,040 | Prod + staging + APIs |
+| Phase 1 (Year 1) | ~$162 | ~$1,944 | Mapbox free tier covers API usage |
+| Phase 1 (After Year 1) | ~$179 | ~$2,148 | Mapbox free tier covers API usage |
+| Phase 2 | ~$525 | ~$6,300 | Mapbox free tier covers API usage |
+| Phase 3 | ~$2,905 | ~$34,860 | Prod + staging, review Mapbox usage |
+| Phase 4 (On-Demand) | ~$2,940 | ~$35,280 | Prod + staging |
+| Phase 4 (Reserved) | ~$2,395 | ~$28,740 | Prod + staging |
 
 **Savings with Reserved Instances (Phase 4)**: ~$6,500/year (18%)
 
@@ -248,7 +248,7 @@ Unchanged from Phase 3: **~$570/month**
 | Service | Account Required | Payment Method |
 |---------|------------------|----------------|
 | AWS | AWS Account | Credit card or invoicing |
-| Google Cloud (Maps) | Google Cloud Project | Credit card |
+| Mapbox | Mapbox Account | Credit card (free tier available) |
 | Google OAuth | Google Cloud Console | Free |
 | Apple OAuth | Apple Developer Account | $99/year |
 | GitHub | GitHub Organization | Free (public) or $4/user/month |
