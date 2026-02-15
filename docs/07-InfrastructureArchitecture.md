@@ -374,93 +374,110 @@ No NAT Gateway, no private subnets, no ALB. The EC2 instance sits in a public su
 |-----------|----------|------|--------|-------------|
 | Inbound | TCP | 5432 | sg-ec2-web | PostgreSQL from EC2 only |
 
+### Infrastructure as Code
+
+Phase 1 infrastructure is provisioned and managed with **OpenTofu** (open-source Terraform fork, MPL 2.0 license). Configuration lives in `AccountabilityAtlas/infra/`.
+
+| Component | Details |
+|-----------|---------|
+| Tool | OpenTofu |
+| Config location | `AccountabilityAtlas/infra/` (top-level repo) |
+| State backend | S3 bucket + DynamoDB lock table |
+| CI execution | GitHub Actions — `tofu plan` on PR, `tofu apply` on merge |
+| AWS authentication | GitHub Actions OIDC federation (no stored credentials) |
+
+OpenTofu manages: VPC, subnets, security groups, EC2, RDS, ECR, SQS, S3, Route 53, Secrets Manager, CloudWatch alarms, and IAM roles.
+
 ### CI/CD Pipeline
 
-Phase 1 uses GitHub Actions for CI and SSH-based deployment:
+Phase 1 uses GitHub Actions for CI and SSH-based deployment. Deployment is triggered after integration tests pass on master:
 
 ```
-┌─────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│  GitHub  │───▶│  GitHub  │───▶│   ECR    │───▶│   EC2    │
-│  (Push)  │    │ Actions  │    │ (Image)  │    │(SSH Pull)│
-└─────────┘    └──────────┘    └──────────┘    └──────────┘
-                    │
-              ┌─────┴─────┐
-              ▼           ▼
-         ┌────────┐  ┌─────────────┐
-         │ Tests  │  │ Lint/Analyze│
-         │(JUnit) │  │(Spotless,   │
-         └────────┘  │Error Prone) │
-                     └─────────────┘
+┌──────────┐    ┌───────────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+│  PR      │───▶│  Per-service  │───▶│ Merge to │───▶│Integ.    │───▶│  Deploy  │
+│  opened  │    │  CI (check)   │    │  master  │    │tests pass│    │  to EC2  │
+└──────────┘    └───────────────┘    └──────────┘    └──────────┘    └──────────┘
+                                                           │
+                                                     ┌─────┴─────┐
+                                                     ▼           ▼
+                                                ┌────────┐  ┌─────────┐
+                                                │API tests│  │E2E tests│
+                                                │(Playwrt)│  │(browser)│
+                                                └────────┘  └─────────┘
 ```
 
-#### GitHub Actions Workflow
+**Deployment flow:**
+1. Each service repo has a `check.yaml` workflow (unit tests, service tests, formatting, static analysis)
+2. PRs are merged to master after per-service CI passes
+3. Integration tests (`AcctAtlas-integration-tests`) run against master — triggered by merge or manual `workflow_dispatch`
+4. On integration test success → deploy workflow builds images, pushes to ECR, deploys via SSH to EC2
+
+#### GitHub Actions Deploy Workflow
 
 ```yaml
-# .github/workflows/deploy.yml
-name: Build and Deploy
+# .github/workflows/deploy.yml (top-level repo)
+name: Deploy
 
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ["Integration Tests"]
+    types: [completed]
+    branches: [master]
+
+permissions:
+  id-token: write   # OIDC
+  contents: read
 
 env:
   AWS_REGION: us-east-1
-  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
 
 jobs:
-  test:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          java-version: "21"
-          distribution: "corretto"
-      - name: Run tests and checks
-        run: ./gradlew check
-
-  build-and-push:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       - uses: aws-actions/amazon-ecr-login@v2
-      - name: Build and push Docker image
-        run: |
-          TAG=$(git rev-parse --short HEAD)
-          docker build -t $ECR_REGISTRY/${{ github.event.repository.name }}:$TAG .
-          docker build -t $ECR_REGISTRY/${{ github.event.repository.name }}:latest .
-          docker push $ECR_REGISTRY/${{ github.event.repository.name }}:$TAG
-          docker push $ECR_REGISTRY/${{ github.event.repository.name }}:latest
-
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
-            cd /opt/accountabilityatlas
-            export TAG=$(git rev-parse --short HEAD)
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d
-            docker image prune -f
+      # Build and push all service images to ECR
+      # SSH to EC2, pull new images, docker compose up -d
+      # Wait for health checks
 ```
+
+> **Note**: The deploy workflow above is a template. Full implementation will include building all service images, pushing to ECR, and SSH-based deployment with health checks. AWS authentication uses OIDC federation — no long-lived access keys stored as GitHub secrets.
+
+### Secrets Management
+
+All secrets are stored in AWS Secrets Manager, never in git:
+
+| Secret | Used By | Notes |
+|--------|---------|-------|
+| JWT RSA key pair | user-service | Loaded via Spring config property, injected as env var from Secrets Manager |
+| Database password | All services | RDS master password |
+| Mapbox access token | web-app | Client-side map rendering |
+| YouTube API key | video-service | Metadata fetching |
+| Admin password hash | user-service | Initial admin account setup (ApplicationRunner) |
+
+Services consume secrets as **environment variables** injected at the container level — no AWS SDK code in application services. See [JWT key stability](#jwt-key-stability) below.
+
+### Seed Data
+
+**Admin account:** The user-service includes an `ApplicationRunner` that checks for `ADMIN_EMAIL` and `ADMIN_PASSWORD_HASH` environment variables on startup. If an admin account doesn't exist, it creates one. In AWS, these values come from Secrets Manager. Locally, the existing dev seed data (`db/devdata/R__dev_seed_users.sql`) continues to work unchanged.
+
+**Bulk video data:** A checked-in seed script (`scripts/seed-videos.sh`) reads a local data file (`seed-data/videos.json`, gitignored) and submits videos via the API, authenticating as admin. Run manually as needed — e.g., once after initial deployment or after a database reset. The data file contains only public information (YouTube URLs, coordinates) but is kept out of git to avoid committing personal curation choices.
+
+### JWT Key Stability
+
+The user-service currently generates a new RSA key pair on every startup, invalidating existing access tokens. For production:
+
+- The `JwtConfig` bean reads the RSA private key from a Spring configuration property (`app.jwt.private-key`)
+- In the `prod` profile, this property is populated from an environment variable sourced from Secrets Manager
+- In `local`/`docker` profiles, the property is absent and the existing auto-generation behavior continues
+- Key rotation: store a new key with a new `kid` in Secrets Manager, deploy — the JWKS endpoint exposes both keys during the transition window, and old tokens validate against the old key until they expire
+
+This approach is **vendor-neutral** — the application code has no AWS dependencies. The container runtime (ECS or Docker Compose with env file) handles the Secrets Manager integration.
 
 ### Monitoring
 
