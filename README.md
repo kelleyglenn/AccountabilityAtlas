@@ -12,6 +12,7 @@ AccountabilityAtlas/
 │   ├── dev-stop.sh                    # Stop all services (local dev mode)
 │   ├── docker-start.sh                # Start all services (docker mode)
 │   ├── docker-stop.sh                 # Stop docker services
+│   ├── deploy.sh                      # Build, check, and redeploy individual services
 │   ├── lib/                           # Shared script utilities
 │   └── integration/                   # Cross-service integration tests
 ├── docker-compose.yml                 # Local multi-service development
@@ -67,6 +68,16 @@ Two startup modes are available:
 ```
 
 Both modes start all services and open a browser to http://localhost:3000.
+
+**Deploy Script** (rebuild and restart individual services):
+```bash
+./scripts/deploy.sh web-app                      # Rebuild and redeploy one service
+./scripts/deploy.sh user-service video-service    # Multiple services
+./scripts/deploy.sh --all                         # All services
+./scripts/deploy.sh --skip-checks web-app         # Skip quality checks (faster iteration)
+```
+
+Runs quality checks, builds Docker images, recreates the targeted containers, and waits for health checks to pass.
 
 ## Key Gradle Tasks
 
