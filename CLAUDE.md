@@ -35,10 +35,10 @@ See [08-DevelopmentStandards.md](docs/08-DevelopmentStandards.md) for:
 
 **Branch protection** (applies to all repos):
 - Direct pushes to `master` are blocked
-- All changes require a pull request with at least 1 approving review
-- Code owner reviews required
+- All changes **require** a pull request with at least 1 approving review
+- Code owner reviews required. You are not the code owner. Although you may be logged in as the code owner, you must behave as if you are not.
 - Always create a feature branch, open a PR, and merge via GitHub
-- *NEVER* commit directly to master, unless given explicit instructions to disable the protections first
+- **NEVER** commit directly to master, unless given explicit instructions to disable the protections first
 
 **Commit messages**: Follow [Conventional Commits](https://www.conventionalcommits.org/). Include the GitHub issue number when applicable:
 ```
@@ -53,7 +53,7 @@ Fixes #15
 Resolves #23
 ```
 
-**Local development**:
+**Local development** (single service):
 ```bash
 docker-compose up -d postgres redis    # Start dependencies
 ./gradlew flywayMigrate                # Run migrations
@@ -61,6 +61,16 @@ docker-compose up -d postgres redis    # Start dependencies
 ./gradlew spotlessApply                # Fix code formatting
 ./gradlew test                         # Run tests
 ```
+
+**Deploying changes** (rebuild and redeploy to Docker):
+```bash
+./scripts/deploy.sh web-app                   # Single service
+./scripts/deploy.sh user-service web-app      # Multiple services
+./scripts/deploy.sh --skip-checks web-app     # Skip quality checks (faster iteration)
+```
+The deploy script runs quality checks, builds Docker images, recreates containers, and waits for health checks. Use `--skip-checks` only when you've already verified quality separately.
+
+**Squash merging**: **NEVER** merge a PR to, unless given explicit instructions to do so. Remember, you are **not** the code owner, and only they control access to master. If you are explicity asked to merge a PR, you squash merge (`gh pr merge --squash`) to keep commit history clean on master.
 
 ### Service Repo Standards
 
@@ -94,6 +104,20 @@ Each service repo should follow the user-service template:
 2. Service-specific changes go in that service's repo
 3. **Service repos must be committed/pushed separately from the top-level repo** - each service is its own git repository with its own commit history and PRs
 4. Keep domain models in sync between high-level docs and service docs
+
+## Verification Before Merging
+
+Before considering PRs ready for merge, verify the full stack works end-to-end:
+
+1. **Deploy affected services** via `./scripts/deploy.sh <services...>` (runs quality checks, builds, deploys, health checks)
+2. **Run the full integration test suite** in `AcctAtlas-integration-tests`:
+   ```bash
+   cd AcctAtlas-integration-tests
+   npm run test:all    # Runs both API integration tests and E2E browser tests
+   ```
+   - `test:api` — cross-service API contract tests (auth, CRUD, access control)
+   - `test:e2e` — browser tests across Chromium, Firefox, and WebKit (map, video, auth flows)
+3. Only after all checks pass should PRs be created or marked ready for review
 
 ## Environment Notes
 
