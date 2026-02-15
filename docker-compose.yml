@@ -149,6 +149,7 @@ services:
       SPRING_CLOUD_AWS_SQS_ENDPOINT: http://localstack:4566
       SPRING_CLOUD_AWS_REGION_STATIC: us-east-1
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      LOCATION_SERVICE_URL: http://location-service:8083
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/actuator/health"]
       interval: 10s
@@ -161,6 +162,8 @@ services:
       redis:
         condition: service_healthy
       localstack:
+        condition: service_healthy
+      location-service:
         condition: service_healthy
     profiles:
       - backend
