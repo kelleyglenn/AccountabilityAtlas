@@ -70,7 +70,7 @@ docker-compose up -d postgres redis    # Start dependencies
 ```
 The deploy script runs quality checks, builds Docker images, recreates containers, and waits for health checks. Use `--skip-checks` only when you've already verified quality separately.
 
-**Squash merging**: **NEVER** merge a PR to, unless given explicit instructions to do so. Remember, you are **not** the code owner, and only they control access to master. If you are explicity asked to merge a PR, you squash merge (`gh pr merge --squash`) to keep commit history clean on master.
+**Squash merging**: **NEVER** merge a PR, unless given explicit instructions to do so. Remember, you are **not** the code owner, and only they control access to master. If you are explicity asked to merge a PR, you squash merge (`gh pr merge --squash`) to keep commit history clean on master.
 
 ### Service Repo Standards
 
