@@ -571,12 +571,13 @@ paths:
 
 ### Test Categories
 
-| Type | Purpose | Tools | Coverage Target |
-|------|---------|-------|-----------------|
-| Unit | Single class/method | JUnit 5, Mockito | 80% |
-| Integration | Service + dependencies | TestContainers | Key paths |
-| Contract | API compatibility | Spring Cloud Contract | All endpoints |
-| E2E | Full user flows | (Client team) | Critical paths |
+| Type | Scope | Tools | Location | Coverage Target |
+|------|-------|-------|----------|-----------------|
+| Unit | Single class/method, mocked dependencies | JUnit 5, Mockito | Each service repo (`unitTest`) | 80% |
+| Service | Single service + real dependencies (DB, Redis) | TestContainers | Each service repo (`integrationTest`) | Key paths |
+| Integration | Full stack — all services running together | Playwright (API + E2E browser tests) | `AcctAtlas-integration-tests` repo | Critical paths |
+
+**Terminology note:** "Service tests" test one service with its real dependencies via TestContainers. "Integration tests" test the entire system end-to-end — API contract tests and browser-based E2E tests running against the full Docker Compose stack.
 
 ### Unit Test Structure
 
