@@ -198,28 +198,20 @@ for target in "${TARGETS[@]}"; do
 done
 
 # Step 3: Determine profiles and flags
-NEEDS_BACKEND=false
-NEEDS_FRONTEND=false
 NEEDS_BUILD=false
 SERVICES=()
 
 for target in "${TARGETS[@]}"; do
     SERVICES+=("$target")
     if [ "$target" = "web-app" ]; then
-        NEEDS_FRONTEND=true
         NEEDS_BUILD=true
-    else
-        NEEDS_BACKEND=true
     fi
 done
 
-PROFILE_ARGS=()
-if [ "$NEEDS_BACKEND" = true ]; then
-    PROFILE_ARGS+=(--profile backend)
-fi
-if [ "$NEEDS_FRONTEND" = true ]; then
-    PROFILE_ARGS+=(--profile frontend)
-fi
+# Always include both profiles so docker-compose can resolve cross-profile
+# dependencies (e.g. web-app depends_on api-gateway). --no-deps ensures
+# only the targeted services are actually restarted.
+PROFILE_ARGS=(--profile backend --profile frontend)
 
 UP_ARGS=(up -d --no-deps --force-recreate)
 if [ "$NEEDS_BUILD" = true ]; then
