@@ -90,6 +90,8 @@ services:
       SPRING_FLYWAY_PASSWORD: local_dev  # dev-only
       MAPBOX_ACCESS_TOKEN: ${MAPBOX_ACCESS_TOKEN:-}
       USER_SERVICE_JWKS_URL: http://user-service:8081/.well-known/jwks.json
+      SPRING_CLOUD_AWS_SQS_ENDPOINT: http://localstack:4566
+      SPRING_CLOUD_AWS_REGION_STATIC: us-east-1
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/actuator/health"]
       interval: 10s
@@ -100,6 +102,8 @@ services:
       postgres:
         condition: service_healthy
       user-service:
+        condition: service_healthy
+      localstack:
         condition: service_healthy
     profiles:
       - backend
