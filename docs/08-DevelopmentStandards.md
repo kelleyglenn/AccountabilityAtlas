@@ -579,6 +579,28 @@ paths:
 
 **Terminology note:** "Service tests" test one service with its real dependencies via TestContainers. "Integration tests" test the entire system end-to-end — API contract tests and browser-based E2E tests running against the full Docker Compose stack.
 
+### TDD Approach: Outside-In
+
+We practice outside-in Test-Driven Development. Tests are written from the outermost boundary inward, then implementation proceeds from the innermost layer outward.
+
+**Test writing order** (outermost first):
+1. **E2E tests** (Playwright, `AcctAtlas-integration-tests`) — define acceptance criteria for the feature
+2. **API integration tests** (`AcctAtlas-integration-tests`) — define the API contract
+3. **Service tests** (TestContainers, each service repo) — test service logic with real dependencies
+4. **Unit tests** (Mockito, each service repo) — test individual classes in isolation
+
+**Implementation order** (innermost first):
+1. **Unit** — implement domain entities, mappers, validators
+2. **Service** — implement service-layer logic
+3. **API** — wire up controllers, run service tests
+4. **E2E** — deploy full stack, run E2E suite
+
+**Branch strategy for TDD:**
+- Commit tests to feature branches early (tests will be "red" / failing)
+- Create PRs only after all tests pass — CI triggers on PR creation, so committing failing tests to a branch is fine as long as no PR exists yet
+
+This approach ensures that acceptance criteria are defined before any implementation starts, and that each layer's contract is locked in before the next layer is built.
+
 ### Unit Test Structure
 
 Unit tests should follow the **Arrange-Act-Assert (AAA)** pattern with comments marking each section:
