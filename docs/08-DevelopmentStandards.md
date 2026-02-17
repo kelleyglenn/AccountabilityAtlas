@@ -527,11 +527,11 @@ GET /api/v1/videos?amendments=FIRST,FOURTH&status=APPROVED&page=0&size=20
 
 ### OpenAPI Documentation
 
-Every service must provide an OpenAPI 3.0 specification:
+Every service must provide an OpenAPI 3.1 specification:
 
 ```yaml
 # docs/api-specification.yaml
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: Video Service API
   version: 1.0.0

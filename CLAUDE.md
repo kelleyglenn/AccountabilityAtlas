@@ -25,7 +25,7 @@ See [08-DevelopmentStandards.md](docs/08-DevelopmentStandards.md) for:
 - **Code style**: Google Java Style Guide, enforced by Spotless
 - **Static analysis**: Error Prone, SonarLint
 - **Testing**: JUnit 5, Mockito, TestContainers (80% coverage target)
-- **API design**: REST conventions, OpenAPI 3.0 specs
+- **API design**: REST conventions, OpenAPI 3.1 specs
 
 ### Common Workflows
 
