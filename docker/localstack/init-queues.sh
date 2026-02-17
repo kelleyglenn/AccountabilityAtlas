@@ -12,9 +12,13 @@ echo "Creating SQS queues..."
 awslocal sqs create-queue --queue-name video-events
 awslocal sqs create-queue --queue-name video-events-dlq
 
-# Moderation events queue
+# Moderation events queue (video-service consumer)
 awslocal sqs create-queue --queue-name moderation-events
 awslocal sqs create-queue --queue-name moderation-events-dlq
+
+# Search moderation events queue (search-service consumer — separate to avoid competing consumers)
+awslocal sqs create-queue --queue-name search-moderation-events
+awslocal sqs create-queue --queue-name search-moderation-events-dlq
 
 # User events queue
 awslocal sqs create-queue --queue-name user-events
