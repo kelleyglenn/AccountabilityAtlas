@@ -20,6 +20,10 @@ awslocal sqs create-queue --queue-name moderation-events-dlq
 awslocal sqs create-queue --queue-name search-moderation-events
 awslocal sqs create-queue --queue-name search-moderation-events-dlq
 
+# Video status events queue (location-service consumer — video approval/removal stats)
+awslocal sqs create-queue --queue-name video-status-events
+awslocal sqs create-queue --queue-name video-status-events-dlq
+
 # User events queue
 awslocal sqs create-queue --queue-name user-events
 awslocal sqs create-queue --queue-name user-events-dlq
