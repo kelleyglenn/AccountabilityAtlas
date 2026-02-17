@@ -47,7 +47,7 @@ service-name/
 │   ├── database-schema.md
 │   └── design-decisions.md
 ├── src/
-│   ├── main/
+│   ├── master/
 │   │   ├── java/
 │   │   │   └── com/accountabilityatlas/servicename/
 │   │   │       ├── ServiceNameApplication.java
@@ -488,6 +488,10 @@ npm install -D eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin
 
 ## API Design Standards
 
+### API First
+
+Whenver an addition or modification needs to be made to an API, update the [OpenAPI Documentation](#openapi-documentation) first, and generate the Spring interfaces and DTOs using the [OpenAPI Generator](#openapi-generator).
+
 ### REST Conventions
 
 ```yaml
@@ -782,24 +786,24 @@ COMMENT ON COLUMN content.videos.video_date IS
 We use [GitHub Flow](https://docs.github.com/en/get-started/using-github/github-flow), a lightweight branch-based workflow optimized for small teams and continuous deployment.
 
 ```
-main (protected)
+master (protected)
 ├── Always deployable
 ├── Requires PR approval
 └── Phase 1-2: deploys to production (no staging env)
     Phase 3+: auto-deploys to staging, manual promotion to production
 
 feature/AA-123-add-video-search
-├── Created from main
+├── Created from master
 ├── Named: feature/{ticket}-{description} or fix/{ticket}-{description}
-├── PR to main when ready
+├── PR to master when ready
 └── Delete after merge
 ```
 
 **Workflow:**
-1. Create a branch from `main` with a descriptive name
+1. Create a branch from `master` with a descriptive name
 2. Make changes and commit with conventional commit messages
-3. Open a pull request to `main`
-4. After review and approval, merge to `main`
+3. Open a pull request to `master`
+4. After review and approval, merge to `master`
 5. Phase 1-2: Changes deploy to production. Phase 3+: Changes auto-deploy to staging; promote to production after verification
 
 ### Commit Messages
@@ -850,9 +854,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   build:
@@ -898,7 +902,7 @@ jobs:
 
   deploy-staging:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to staging
