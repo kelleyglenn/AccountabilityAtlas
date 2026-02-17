@@ -47,7 +47,7 @@ service-name/
 │   ├── database-schema.md
 │   └── design-decisions.md
 ├── src/
-│   ├── main/
+│   ├── master/
 │   │   ├── java/
 │   │   │   └── com/accountabilityatlas/servicename/
 │   │   │       ├── ServiceNameApplication.java
@@ -488,6 +488,10 @@ npm install -D eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin
 
 ## API Design Standards
 
+### API First
+
+Whenver an addition or modification needs to be made to an API, update the [OpenAPI Documentation](#openapi-documentation) first, and generate the Spring interfaces and DTOs using the [OpenAPI Generator](#openapi-generator).
+
 ### REST Conventions
 
 ```yaml
@@ -523,11 +527,11 @@ GET /api/v1/videos?amendments=FIRST,FOURTH&status=APPROVED&page=0&size=20
 
 ### OpenAPI Documentation
 
-Every service must provide an OpenAPI 3.0 specification:
+Every service must provide an OpenAPI 3.1 specification:
 
 ```yaml
 # docs/api-specification.yaml
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: Video Service API
   version: 1.0.0
@@ -578,6 +582,28 @@ paths:
 | Integration | Full stack — all services running together | Playwright (API + E2E browser tests) | `AcctAtlas-integration-tests` repo | Critical paths |
 
 **Terminology note:** "Service tests" test one service with its real dependencies via TestContainers. "Integration tests" test the entire system end-to-end — API contract tests and browser-based E2E tests running against the full Docker Compose stack.
+
+### TDD Approach: Outside-In
+
+We practice outside-in Test-Driven Development. Tests are written from the outermost boundary inward, then implementation proceeds from the innermost layer outward.
+
+**Test writing order** (outermost first):
+1. **E2E tests** (Playwright, `AcctAtlas-integration-tests`) — define acceptance criteria for the feature
+2. **API integration tests** (`AcctAtlas-integration-tests`) — define the API contract
+3. **Service tests** (TestContainers, each service repo) — test service logic with real dependencies
+4. **Unit tests** (Mockito, each service repo) — test individual classes in isolation
+
+**Implementation order** (innermost first):
+1. **Unit** — implement domain entities, mappers, validators
+2. **Service** — implement service-layer logic
+3. **API** — wire up controllers, run service tests
+4. **E2E** — deploy full stack, run E2E suite
+
+**Branch strategy for TDD:**
+- Commit tests to feature branches early (tests will be "red" / failing)
+- Create PRs only after all tests pass — CI triggers on PR creation, so committing failing tests to a branch is fine as long as no PR exists yet
+
+This approach ensures that acceptance criteria are defined before any implementation starts, and that each layer's contract is locked in before the next layer is built.
 
 ### Unit Test Structure
 
@@ -760,24 +786,24 @@ COMMENT ON COLUMN content.videos.video_date IS
 We use [GitHub Flow](https://docs.github.com/en/get-started/using-github/github-flow), a lightweight branch-based workflow optimized for small teams and continuous deployment.
 
 ```
-main (protected)
+master (protected)
 ├── Always deployable
 ├── Requires PR approval
 └── Phase 1-2: deploys to production (no staging env)
     Phase 3+: auto-deploys to staging, manual promotion to production
 
 feature/AA-123-add-video-search
-├── Created from main
+├── Created from master
 ├── Named: feature/{ticket}-{description} or fix/{ticket}-{description}
-├── PR to main when ready
+├── PR to master when ready
 └── Delete after merge
 ```
 
 **Workflow:**
-1. Create a branch from `main` with a descriptive name
+1. Create a branch from `master` with a descriptive name
 2. Make changes and commit with conventional commit messages
-3. Open a pull request to `main`
-4. After review and approval, merge to `main`
+3. Open a pull request to `master`
+4. After review and approval, merge to `master`
 5. Phase 1-2: Changes deploy to production. Phase 3+: Changes auto-deploy to staging; promote to production after verification
 
 ### Commit Messages
@@ -828,9 +854,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   build:
@@ -876,7 +902,7 @@ jobs:
 
   deploy-staging:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to staging

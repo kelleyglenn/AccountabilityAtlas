@@ -25,7 +25,7 @@ See [08-DevelopmentStandards.md](docs/08-DevelopmentStandards.md) for:
 - **Code style**: Google Java Style Guide, enforced by Spotless
 - **Static analysis**: Error Prone, SonarLint
 - **Testing**: JUnit 5, Mockito, TestContainers (80% coverage target)
-- **API design**: REST conventions, OpenAPI 3.0 specs
+- **API design**: REST conventions, OpenAPI 3.1 specs
 
 ### Common Workflows
 
@@ -118,6 +118,14 @@ Before considering PRs ready for merge, verify the full stack works end-to-end:
    - `test:api` — cross-service API contract tests (auth, CRUD, access control)
    - `test:e2e` — browser tests across Chromium, Firefox, and WebKit (map, video, auth flows)
 3. Only after all checks pass should PRs be created or marked ready for review
+4. **Check CI status** on all PRs after pushing — do not consider a PR ready until its CI pipeline passes
+
+## PR Ordering for Integration Tests
+
+**Do NOT create a PR for `AcctAtlas-integration-tests` until the service PRs it depends on are merged.** Integration tests run against the deployed stack, so their PR only makes sense once the services they test are on master. Workflow:
+
+1. Create and merge service PRs first (user-service, video-service, web-app, etc.)
+2. Then create the integration-tests PR referencing the merged service changes
 
 ## Environment Notes
 

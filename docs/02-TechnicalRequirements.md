@@ -101,7 +101,7 @@ Security controls scale with deployment phase:
 |-------|------------|-----------|
 | Backend Language | Java 21 LTS (Amazon Corretto) | Team expertise, JVM ecosystem |
 | Backend Framework | Spring Boot 3.4.x | Production-ready, extensive ecosystem |
-| API Protocol | REST + OpenAPI 3.0 | Industry standard, tooling support |
+| API Protocol | REST + OpenAPI 3.1 | Industry standard, tooling support |
 | Primary Database | PostgreSQL 15 with PostGIS | Relational + spatial queries |
 | Search Engine | PostgreSQL FTS (Phase 1-2), OpenSearch 2.x (Phase 3+) | Full-text + faceted search |
 | Cache | Redis 7.x | Session, caching, rate limiting |
@@ -159,7 +159,7 @@ All backend services calling external APIs must implement these patterns:
 - Alert on elevated external API error rates
 
 ### API Requirements
-- RESTful API design following OpenAPI 3.0 specification
+- RESTful API design following OpenAPI 3.1 specification
 - JSON request/response format
 - Versioned endpoints (v1, v2)
 - Consistent error response format
