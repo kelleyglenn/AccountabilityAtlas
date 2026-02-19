@@ -168,7 +168,7 @@ Video
 ├── publishedAt: Timestamp (YouTube publish date)
 ├── videoDate: Date (incident date, user-provided)
 ├── amendments: Set<Amendment> (FIRST, SECOND, FOURTH, FIFTH)
-├── participants: Set<Participant> (POLICE, GOVERNMENT, BUSINESS, CITIZEN)
+├── participants: Set<Participant> (POLICE, GOVERNMENT, BUSINESS, CITIZEN, SECURITY)
 ├── status: Enum (PENDING, APPROVED, REJECTED, DELETED)
 ├── submittedBy: UUID (User reference)
 ├── locations: List<VideoLocation>
@@ -346,7 +346,7 @@ GET /search
   "channelName": "string",
   "publishedAt": "2024-01-01T00:00:00Z",
   "amendments": ["FIRST", "FOURTH"],
-  "participants": ["POLICE", "CITIZEN"],
+  "participants": ["POLICE", "SECURITY"],
   "submitterName": "string",
   "locations": [
     {

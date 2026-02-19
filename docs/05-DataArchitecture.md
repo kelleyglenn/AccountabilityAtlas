@@ -205,7 +205,7 @@ CREATE TABLE content.videos (
         amendments <@ ARRAY['FIRST', 'SECOND', 'FOURTH', 'FIFTH']::VARCHAR[]
     ),
     CONSTRAINT valid_participants CHECK (
-        participants <@ ARRAY['POLICE', 'GOVERNMENT', 'BUSINESS', 'CITIZEN']::VARCHAR[]
+        participants <@ ARRAY['POLICE', 'GOVERNMENT', 'BUSINESS', 'CITIZEN', 'SECURITY']::VARCHAR[]
     )
 );
 
