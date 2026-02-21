@@ -1,54 +1,52 @@
 -- RDS Database Initialization Script
 -- Run once on first deployment to create per-service databases and users.
 --
--- Usage (from EC2 instance):
---   psql -h <RDS_ENDPOINT> -U postgres -d accountabilityatlas -f init-databases.sql
+-- RDS notes:
+--   - CREATE DATABASE cannot run inside a transaction, so this script must be
+--     run as individual statements (psql -c per command), not with psql -f.
+--   - The postgres user must be granted each role before creating a database
+--     owned by that role (RDS restriction — postgres is not a true superuser).
 --
--- Replace CHANGE_ME_DB_PASSWORD with the actual service database password before running.
+-- Usage (from EC2 instance):
+--   export PGHOST=<RDS_ENDPOINT_HOST>
+--   export PGUSER=postgres
+--   export PGPASSWORD='<master_password>'
+--
+--   # Replace CHANGE_ME_DB_PASSWORD below, then run each statement:
+--   psql -d accountabilityatlas -c "CREATE USER user_service WITH PASSWORD 'CHANGE_ME_DB_PASSWORD';"
+--   psql -d accountabilityatlas -c "GRANT user_service TO postgres;"
+--   psql -d accountabilityatlas -c "CREATE DATABASE user_service OWNER user_service;"
+--   psql -d user_service -c "GRANT ALL ON SCHEMA public TO user_service;"
+--   # ... repeat for each service below ...
+--
+-- Services and their databases:
 
--- Create user_service database and user
+-- user_service
 CREATE USER user_service WITH PASSWORD 'CHANGE_ME_DB_PASSWORD';
+GRANT user_service TO postgres;
 CREATE DATABASE user_service OWNER user_service;
-GRANT ALL PRIVILEGES ON DATABASE user_service TO user_service;
+-- then: psql -d user_service -c "GRANT ALL ON SCHEMA public TO user_service;"
 
--- Connect to user_service database to set up schema permissions
-\c user_service
-GRANT ALL ON SCHEMA public TO user_service;
-
--- Location Service database
-\c accountabilityatlas
-CREATE USER location_service WITH PASSWORD 'CHANGE_ME_DB_PASSWORD';
-CREATE DATABASE location_service OWNER location_service;
-GRANT ALL PRIVILEGES ON DATABASE location_service TO location_service;
-
--- Connect to location_service database; create PostGIS extension (requires rds_superuser role)
-\c location_service
-CREATE EXTENSION IF NOT EXISTS postgis;
-GRANT ALL ON SCHEMA public TO location_service;
-
--- Search Service database
-\c accountabilityatlas
-CREATE USER search_service WITH PASSWORD 'CHANGE_ME_DB_PASSWORD';
-CREATE DATABASE search_service OWNER search_service;
-GRANT ALL PRIVILEGES ON DATABASE search_service TO search_service;
-
-\c search_service
-GRANT ALL ON SCHEMA public TO search_service;
-
--- Video Service database
-\c accountabilityatlas
+-- video_service
 CREATE USER video_service WITH PASSWORD 'CHANGE_ME_DB_PASSWORD';
+GRANT video_service TO postgres;
 CREATE DATABASE video_service OWNER video_service;
-GRANT ALL PRIVILEGES ON DATABASE video_service TO video_service;
+-- then: psql -d video_service -c "GRANT ALL ON SCHEMA public TO video_service;"
 
-\c video_service
-GRANT ALL ON SCHEMA public TO video_service;
+-- location_service
+CREATE USER location_service WITH PASSWORD 'CHANGE_ME_DB_PASSWORD';
+GRANT location_service TO postgres;
+CREATE DATABASE location_service OWNER location_service;
+-- then: psql -d location_service -c "CREATE EXTENSION IF NOT EXISTS postgis; GRANT ALL ON SCHEMA public TO location_service;"
 
--- Moderation Service database
-\c accountabilityatlas
+-- search_service
+CREATE USER search_service WITH PASSWORD 'CHANGE_ME_DB_PASSWORD';
+GRANT search_service TO postgres;
+CREATE DATABASE search_service OWNER search_service;
+-- then: psql -d search_service -c "GRANT ALL ON SCHEMA public TO search_service;"
+
+-- moderation_service
 CREATE USER moderation_service WITH PASSWORD 'CHANGE_ME_DB_PASSWORD';
+GRANT moderation_service TO postgres;
 CREATE DATABASE moderation_service OWNER moderation_service;
-GRANT ALL PRIVILEGES ON DATABASE moderation_service TO moderation_service;
-
-\c moderation_service
-GRANT ALL ON SCHEMA public TO moderation_service;
+-- then: psql -d moderation_service -c "GRANT ALL ON SCHEMA public TO moderation_service;"
