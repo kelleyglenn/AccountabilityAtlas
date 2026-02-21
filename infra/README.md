@@ -52,6 +52,9 @@ rm jwt-private.pem
 ## 4. Store Remaining Secrets
 
 ```bash
+aws secretsmanager create-secret --name accountabilityatlas/db-password \
+  --secret-string 'YOUR_RDS_MASTER_PASSWORD' --region us-east-2
+
 aws secretsmanager create-secret --name accountabilityatlas/youtube-api-key \
   --secret-string 'YOUR_YOUTUBE_API_KEY' --region us-east-2
 
@@ -69,6 +72,8 @@ htpasswd -nbBC 12 "" 'your-password' | cut -d: -f2
 aws secretsmanager create-secret --name accountabilityatlas/admin-password-hash \
   --secret-string 'BCRYPT_HASH_FROM_ABOVE' --region us-east-2
 ```
+
+**Important:** The `db-password` value must match the `db_password` in your `terraform.tfvars`.
 
 ## 5. Create terraform.tfvars
 

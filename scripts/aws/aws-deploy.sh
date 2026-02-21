@@ -291,11 +291,11 @@ info "Waiting for services to become healthy..."
 
 HEALTH_FAILED=false
 
-if ! wait_for_url "http://$EC2_IP:8080/actuator/health" "api-gateway" 60 5; then
+if ! wait_for_health_ssh "http://localhost:8080/actuator/health" "api-gateway" 60 5; then
     HEALTH_FAILED=true
 fi
 
-if ! wait_for_url "http://$EC2_IP:3000" "web-app" 30 5; then
+if ! wait_for_health_ssh "http://localhost:3000" "web-app" 30 5; then
     HEALTH_FAILED=true
 fi
 
@@ -315,7 +315,6 @@ echo -e "${GREEN}============================================${NC}"
 echo ""
 echo "  Tag:          $DEPLOY_TAG"
 echo "  Application:  https://$DOMAIN_NAME"
-echo "  API Gateway:  http://$EC2_IP:8080/actuator/health"
 echo ""
 echo "  SSH access:"
 echo "    ssh -i $SSH_KEY_PATH $SSH_USER@$EC2_IP"

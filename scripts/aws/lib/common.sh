@@ -113,3 +113,31 @@ wait_for_url() {
     error "$name failed to respond after $max_attempts attempts ($(( max_attempts * interval ))s)"
     return 1
 }
+
+# ---------------------------------------------------------------------------
+# wait_for_health_ssh - poll a localhost URL on EC2 via SSH until HTTP 200
+# Usage: wait_for_health_ssh <url> <name> [max_attempts] [interval]
+# ---------------------------------------------------------------------------
+wait_for_health_ssh() {
+    local url=$1
+    local name=$2
+    local max_attempts=${3:-30}
+    local interval=${4:-5}
+    local attempt=1
+
+    info "Waiting for $name ($url via SSH)..."
+
+    while [ $attempt -le $max_attempts ]; do
+        if ssh_ec2 "curl -s -f -o /dev/null '$url'" 2>/dev/null; then
+            success "$name is ready!"
+            return 0
+        fi
+        echo -n "."
+        sleep "$interval"
+        attempt=$((attempt + 1))
+    done
+
+    echo ""
+    error "$name failed to respond after $max_attempts attempts ($(( max_attempts * interval ))s)"
+    return 1
+}

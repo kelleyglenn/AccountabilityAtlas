@@ -86,6 +86,23 @@ resource "aws_cloudwatch_metric_alarm" "ec2_status_check" {
   dimensions = { InstanceId = aws_instance.app.id }
 }
 
+resource "aws_cloudwatch_metric_alarm" "sqs_queue_depth" {
+  for_each = aws_sqs_queue.main
+
+  alarm_name          = "${var.project_name}-sqs-${each.key}-depth"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 300
+  statistic           = "Maximum"
+  threshold           = 1000
+  alarm_description   = "SQS queue ${each.key} depth >1,000"
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+
+  dimensions = { QueueName = each.value.name }
+}
+
 resource "aws_cloudwatch_log_group" "app" {
   name              = "/accountabilityatlas/prod"
   retention_in_days = 30
