@@ -9,16 +9,17 @@
 #   wait_for_url - poll a URL until it returns HTTP 200
 #
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AWS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source the project-wide common utilities (colored output, health checks, etc.)
-source "$SCRIPT_DIR/../../lib/common.sh"
+# Note: this overwrites SCRIPT_DIR, so we use AWS_SCRIPT_DIR for our own paths.
+source "$AWS_SCRIPT_DIR/../../lib/common.sh"
 
 # ---------------------------------------------------------------------------
 # load_config - source config.env and validate that all required vars are set
 # ---------------------------------------------------------------------------
 load_config() {
-    local config_file="$SCRIPT_DIR/../config.env"
+    local config_file="$AWS_SCRIPT_DIR/../config.env"
 
     if [ ! -f "$config_file" ]; then
         error "Config file not found: $config_file"

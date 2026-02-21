@@ -1,5 +1,10 @@
 # Production deployment - all variables sourced from .env file
 # See .env.example for required variables
+#
+# TODO: Add centralized logging. The awslogs Docker driver is not available
+# on Amazon Linux 2023's default Docker package. Options: install the awslogs
+# plugin, use Fluent Bit sidecar, or collect logs from docker json-file driver
+# via CloudWatch agent. See #81 for tracking.
 
 services:
   nginx:
@@ -31,6 +36,7 @@ services:
       LOCATION_SERVICE_URL: http://location-service:8083
       SEARCH_SERVICE_URL: http://search-service:8084
       MODERATION_SERVICE_URL: http://moderation-service:8085
+      APP_CORS_ALLOWED_ORIGINS: https://${DOMAIN_NAME},https://www.${DOMAIN_NAME}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     healthcheck:
@@ -52,12 +58,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: api-gateway
     deploy:
       resources:
         limits:
@@ -78,7 +78,10 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      SPRING_CLOUD_AWS_CREDENTIALS_ACCESS_KEY: ""
+      SPRING_CLOUD_AWS_CREDENTIALS_SECRET_KEY: ""
       APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
+      APP_SQS_USER_EVENTS_QUEUE: ${SQS_PREFIX}-user-events
       APP_JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH}
@@ -91,12 +94,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: user-service
     deploy:
       resources:
         limits:
@@ -117,7 +114,11 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      SPRING_CLOUD_AWS_CREDENTIALS_ACCESS_KEY: ""
+      SPRING_CLOUD_AWS_CREDENTIALS_SECRET_KEY: ""
       APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
+      APP_SQS_MODERATION_EVENTS_QUEUE: ${SQS_PREFIX}-moderation-events
+      APP_SQS_VIDEO_STATUS_EVENTS_QUEUE: ${SQS_PREFIX}-video-status-events
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
       USER_SERVICE_JWKS_URL: http://user-service:8081/.well-known/jwks.json
       LOCATION_SERVICE_URL: http://location-service:8083
@@ -132,12 +133,6 @@ services:
         condition: service_healthy
       user-service:
         condition: service_healthy
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: video-service
     deploy:
       resources:
         limits:
@@ -156,6 +151,9 @@ services:
       SPRING_FLYWAY_USER: location_service
       SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD}
       SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      SPRING_CLOUD_AWS_CREDENTIALS_ACCESS_KEY: ""
+      SPRING_CLOUD_AWS_CREDENTIALS_SECRET_KEY: ""
+      APP_SQS_VIDEO_STATUS_EVENTS_QUEUE: ${SQS_PREFIX}-video-status-events
       MAPBOX_ACCESS_TOKEN: ${MAPBOX_TOKEN}
       USER_SERVICE_JWKS_URL: http://user-service:8081/.well-known/jwks.json
     healthcheck:
@@ -167,12 +165,6 @@ services:
     depends_on:
       user-service:
         condition: service_healthy
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: location-service
     deploy:
       resources:
         limits:
@@ -191,7 +183,10 @@ services:
       SPRING_FLYWAY_USER: search_service
       SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD}
       SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      SPRING_CLOUD_AWS_CREDENTIALS_ACCESS_KEY: ""
+      SPRING_CLOUD_AWS_CREDENTIALS_SECRET_KEY: ""
       APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
+      APP_SQS_SEARCH_MODERATION_EVENTS_QUEUE: ${SQS_PREFIX}-search-moderation-events
       VIDEO_SERVICE_URL: http://video-service:8082
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8084/actuator/health"]
@@ -202,12 +197,6 @@ services:
     depends_on:
       video-service:
         condition: service_healthy
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: search-service
     deploy:
       resources:
         limits:
@@ -226,19 +215,22 @@ services:
       SPRING_FLYWAY_USER: moderation_service
       SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD}
       SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      SPRING_CLOUD_AWS_CREDENTIALS_ACCESS_KEY: ""
+      SPRING_CLOUD_AWS_CREDENTIALS_SECRET_KEY: ""
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://user-service:8081/.well-known/jwks.json
       APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
+      APP_SQS_USER_EVENTS_QUEUE: ${SQS_PREFIX}-user-events
+      APP_SQS_MODERATION_EVENTS_QUEUE: ${SQS_PREFIX}-moderation-events
+      APP_SQS_SEARCH_MODERATION_EVENTS_QUEUE: ${SQS_PREFIX}-search-moderation-events
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8085/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: moderation-service
+    depends_on:
+      user-service:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -260,12 +252,6 @@ services:
     depends_on:
       api-gateway:
         condition: service_started
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: web-app
     deploy:
       resources:
         limits:

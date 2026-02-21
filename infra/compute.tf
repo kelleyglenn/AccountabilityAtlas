@@ -87,6 +87,14 @@ mkdir -p /home/ec2-user/app
 chown ec2-user:ec2-user /home/ec2-user/app
   EOF
 
+  # Allow Docker containers on the bridge network to reach the instance
+  # metadata service (IMDSv2 default hop limit of 1 blocks them).
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+
   iam_instance_profile = aws_iam_instance_profile.ec2.name
 
   tags = { Name = "${var.project_name}-app" }
