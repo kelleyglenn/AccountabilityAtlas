@@ -1,0 +1,5 @@
+domain_name      = "yourdomain.com"
+db_password      = "CHANGE_ME"
+ssh_public_key   = "ssh-rsa AAAA..."
+allowed_ssh_cidr = "YOUR_IP/32"
+alert_email      = "you@example.com"

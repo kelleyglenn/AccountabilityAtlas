@@ -38,3 +38,14 @@ logs/*
 # Test coverage
 coverage/
 .nyc_output/
+
+# OpenTofu / Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.backup
+infra/*.tfvars
+!infra/example.tfvars
+
+# AWS deployment config
+scripts/aws/config.env
+infra/docker/.env
