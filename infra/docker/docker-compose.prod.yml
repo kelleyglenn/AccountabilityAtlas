@@ -73,6 +73,7 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
       APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
+      APP_SQS_USER_EVENTS_QUEUE: ${SQS_PREFIX}-user-events
       APP_JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH}
@@ -106,6 +107,8 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
       APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
+      APP_SQS_VIDEO_STATUS_EVENTS_QUEUE: ${SQS_PREFIX}-video-status-events
+      APP_SQS_MODERATION_EVENTS_QUEUE: ${SQS_PREFIX}-moderation-events
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
       USER_SERVICE_JWKS_URL: http://user-service:8081/.well-known/jwks.json
       LOCATION_SERVICE_URL: http://location-service:8083
@@ -169,6 +172,7 @@ services:
       SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD}
       SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
       APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
+      APP_SQS_SEARCH_MODERATION_EVENTS_QUEUE: ${SQS_PREFIX}-search-moderation-events
       VIDEO_SERVICE_URL: http://video-service:8082
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8084/actuator/health"]
@@ -198,6 +202,9 @@ services:
       SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD}
       SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
       APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
+      APP_SQS_USER_EVENTS_QUEUE: ${SQS_PREFIX}-user-events
+      APP_SQS_MODERATION_EVENTS_QUEUE: ${SQS_PREFIX}-moderation-events
+      APP_SQS_SEARCH_MODERATION_EVENTS_QUEUE: ${SQS_PREFIX}-search-moderation-events
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8085/actuator/health"]
       interval: 10s
