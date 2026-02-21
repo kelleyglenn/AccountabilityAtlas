@@ -52,12 +52,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: api-gateway
     deploy:
       resources:
         limits:
@@ -91,12 +85,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: user-service
     deploy:
       resources:
         limits:
@@ -132,12 +120,6 @@ services:
         condition: service_healthy
       user-service:
         condition: service_healthy
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: video-service
     deploy:
       resources:
         limits:
@@ -167,12 +149,6 @@ services:
     depends_on:
       user-service:
         condition: service_healthy
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: location-service
     deploy:
       resources:
         limits:
@@ -202,12 +178,6 @@ services:
     depends_on:
       video-service:
         condition: service_healthy
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: search-service
     deploy:
       resources:
         limits:
@@ -233,12 +203,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: moderation-service
     deploy:
       resources:
         limits:
@@ -260,12 +224,6 @@ services:
     depends_on:
       api-gateway:
         condition: service_started
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: ${AWS_REGION}
-        awslogs-group: /accountabilityatlas/prod
-        awslogs-stream-prefix: web-app
     deploy:
       resources:
         limits:
