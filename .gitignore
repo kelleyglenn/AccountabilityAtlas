@@ -46,6 +46,9 @@ infra/*.tfstate.backup
 infra/*.tfvars
 !infra/example.tfvars
 
+# Seed data (generated, keep local)
+seed-data/*.json
+
 # AWS deployment config
 scripts/aws/config.env
 infra/docker/.env
