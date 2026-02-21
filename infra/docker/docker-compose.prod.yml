@@ -138,6 +138,7 @@ services:
       SPRING_FLYWAY_USER: location_service
       SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD}
       SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      APP_SQS_VIDEO_STATUS_EVENTS_QUEUE: ${SQS_PREFIX}-video-status-events
       MAPBOX_ACCESS_TOKEN: ${MAPBOX_TOKEN}
       USER_SERVICE_JWKS_URL: http://user-service:8081/.well-known/jwks.json
     healthcheck:
