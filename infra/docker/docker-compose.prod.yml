@@ -1,5 +1,10 @@
 # Production deployment - all variables sourced from .env file
 # See .env.example for required variables
+#
+# TODO: Add centralized logging. The awslogs Docker driver is not available
+# on Amazon Linux 2023's default Docker package. Options: install the awslogs
+# plugin, use Fluent Bit sidecar, or collect logs from docker json-file driver
+# via CloudWatch agent. See #81 for tracking.
 
 services:
   nginx:
@@ -223,6 +228,9 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    depends_on:
+      user-service:
+        condition: service_healthy
     deploy:
       resources:
         limits:
