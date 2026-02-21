@@ -31,6 +31,7 @@ services:
       LOCATION_SERVICE_URL: http://location-service:8083
       SEARCH_SERVICE_URL: http://search-service:8084
       MODERATION_SERVICE_URL: http://moderation-service:8085
+      APP_CORS_ALLOWED_ORIGINS: https://${DOMAIN_NAME},https://www.${DOMAIN_NAME}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     healthcheck:
