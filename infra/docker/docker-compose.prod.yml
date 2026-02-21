@@ -1,0 +1,294 @@
+# Production deployment - all variables sourced from .env file
+# See .env.example for required variables
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /home/ec2-user/app/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      api-gateway:
+        condition: service_started
+      web-app:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+    restart: always
+
+  api-gateway:
+    image: ${ECR_REGISTRY}/acct-atlas-api-gateway:${TAG}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      USER_SERVICE_URL: http://user-service:8081
+      VIDEO_SERVICE_URL: http://video-service:8082
+      LOCATION_SERVICE_URL: http://location-service:8083
+      SEARCH_SERVICE_URL: http://search-service:8084
+      MODERATION_SERVICE_URL: http://moderation-service:8085
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      user-service:
+        condition: service_healthy
+      video-service:
+        condition: service_healthy
+      location-service:
+        condition: service_healthy
+      search-service:
+        condition: service_healthy
+      moderation-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /accountabilityatlas/prod
+        awslogs-stream-prefix: api-gateway
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: always
+
+  user-service:
+    image: ${ECR_REGISTRY}/acct-atlas-user-service:${TAG}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}/user_service
+      SPRING_DATASOURCE_USERNAME: user_service
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_FLYWAY_URL: jdbc:postgresql://${RDS_ENDPOINT}/user_service
+      SPRING_FLYWAY_USER: user_service
+      SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
+      APP_JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      redis:
+        condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /accountabilityatlas/prod
+        awslogs-stream-prefix: user-service
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: always
+
+  video-service:
+    image: ${ECR_REGISTRY}/acct-atlas-video-service:${TAG}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}/video_service
+      SPRING_DATASOURCE_USERNAME: video_service
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_FLYWAY_URL: jdbc:postgresql://${RDS_ENDPOINT}/video_service
+      SPRING_FLYWAY_USER: video_service
+      SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
+      USER_SERVICE_JWKS_URL: http://user-service:8081/.well-known/jwks.json
+      LOCATION_SERVICE_URL: http://location-service:8083
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      redis:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /accountabilityatlas/prod
+        awslogs-stream-prefix: video-service
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: always
+
+  location-service:
+    image: ${ECR_REGISTRY}/acct-atlas-location-service:${TAG}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}/location_service
+      SPRING_DATASOURCE_USERNAME: location_service
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_FLYWAY_URL: jdbc:postgresql://${RDS_ENDPOINT}/location_service
+      SPRING_FLYWAY_USER: location_service
+      SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD}
+      SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      MAPBOX_ACCESS_TOKEN: ${MAPBOX_TOKEN}
+      USER_SERVICE_JWKS_URL: http://user-service:8081/.well-known/jwks.json
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      user-service:
+        condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /accountabilityatlas/prod
+        awslogs-stream-prefix: location-service
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: always
+
+  search-service:
+    image: ${ECR_REGISTRY}/acct-atlas-search-service:${TAG}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,fts
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}/search_service
+      SPRING_DATASOURCE_USERNAME: search_service
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_FLYWAY_URL: jdbc:postgresql://${RDS_ENDPOINT}/search_service
+      SPRING_FLYWAY_USER: search_service
+      SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD}
+      SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
+      VIDEO_SERVICE_URL: http://video-service:8082
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      video-service:
+        condition: service_healthy
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /accountabilityatlas/prod
+        awslogs-stream-prefix: search-service
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: always
+
+  moderation-service:
+    image: ${ECR_REGISTRY}/acct-atlas-moderation-service:${TAG}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}/moderation_service
+      SPRING_DATASOURCE_USERNAME: moderation_service
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_FLYWAY_URL: jdbc:postgresql://${RDS_ENDPOINT}/moderation_service
+      SPRING_FLYWAY_USER: moderation_service
+      SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD}
+      SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
+      APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8085/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /accountabilityatlas/prod
+        awslogs-stream-prefix: moderation-service
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 512M
+    restart: always
+
+  web-app:
+    image: ${ECR_REGISTRY}/acct-atlas-web-app:${TAG}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      api-gateway:
+        condition: service_started
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /accountabilityatlas/prod
+        awslogs-stream-prefix: web-app
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.15"
+          memory: 640M
+    restart: always
+
+volumes:
+  redis-data:
