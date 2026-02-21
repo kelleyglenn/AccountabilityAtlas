@@ -21,6 +21,7 @@ AccountabilityAtlas enables users to discover, contribute, and explore videos of
 | [09-CostEstimate.md](09-CostEstimate.md) | Detailed cost breakdown by environment and service |
 | [10-FutureFeatures.md](10-FutureFeatures.md) | Future features roadmap and enhancements |
 | [11-IntegrationTesting.md](11-IntegrationTesting.md) | E2E and API integration testing guide |
+| [../infra/README.md](../infra/README.md) | AWS bootstrap and deployment setup |
 
 ## Related Repositories
 
