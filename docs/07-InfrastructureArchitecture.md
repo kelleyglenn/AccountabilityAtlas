@@ -2,7 +2,7 @@
 
 ## Cloud Platform
 
-**Primary Region**: us-east-1 (N. Virginia)
+**Primary Region**: us-east-2 (Ohio)
 **DR Region**: us-west-2 (Oregon) — Phase 4
 **Cloud Provider**: Amazon Web Services (AWS)
 **Current Phase**: 1 (Launch)
@@ -45,7 +45,7 @@ See [ADR-006: Phased Deployment Strategy](03-ArchitectureOverview.md#adr-006-pha
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│                       PRODUCTION (us-east-1)                                  │
+│                       PRODUCTION (us-east-2)                                  │
 │                                                                               │
 │  ┌──────────────────────────────────────────────────────────────────────┐    │
 │  │                    EC2 t3.xlarge (4 vCPU, 16 GB)                     │    │
@@ -342,10 +342,10 @@ VPC CIDR: 10.0.0.0/16
 
 Subnets:
 ├── Public (EC2 instance)
-│   └── us-east-1a: 10.0.1.0/24
+│   └── us-east-2a: 10.0.1.0/24
 └── Data (RDS)
-    └── us-east-1a: 10.0.20.0/24
-    └── us-east-1b: 10.0.21.0/24  (required for RDS subnet group)
+    └── us-east-2a: 10.0.20.0/24
+    └── us-east-2b: 10.0.21.0/24  (required for RDS subnet group)
 ```
 
 No NAT Gateway, no private subnets, no ALB. The EC2 instance sits in a public subnet with a public IP. RDS sits in a data subnet accessible only from the EC2 security group.
@@ -429,7 +429,7 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: us-east-2
 
 jobs:
   deploy:
@@ -505,7 +505,7 @@ All containers log to stdout/stderr. Docker's `awslogs` log driver forwards logs
 logging:
   driver: awslogs
   options:
-    awslogs-region: us-east-1
+    awslogs-region: us-east-2
     awslogs-group: /accountabilityatlas/prod
     awslogs-stream-prefix: ${SERVICE_NAME}
 ```
@@ -584,14 +584,14 @@ VPC CIDR: 10.0.0.0/16
 
 Subnets:
 ├── Public (NAT Gateway, ALB)
-│   ├── us-east-1a: 10.0.1.0/24
-│   └── us-east-1b: 10.0.2.0/24
+│   ├── us-east-2a: 10.0.1.0/24
+│   └── us-east-2b: 10.0.2.0/24
 ├── Private (ECS Services)
-│   ├── us-east-1a: 10.0.10.0/24
-│   └── us-east-1b: 10.0.11.0/24
+│   ├── us-east-2a: 10.0.10.0/24
+│   └── us-east-2b: 10.0.11.0/24
 └── Data (RDS, ElastiCache)
-    ├── us-east-1a: 10.0.20.0/24
-    └── us-east-1b: 10.0.21.0/24
+    ├── us-east-2a: 10.0.20.0/24
+    └── us-east-2b: 10.0.21.0/24
 ```
 
 ### DNS Configuration (Route 53)
@@ -655,7 +655,7 @@ At this user scale, changes should be validated before production. A staging env
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   STAGING (us-east-1)                        │
+│                   STAGING (us-east-2)                        │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │                 ECS Cluster (staging)                 │   │
@@ -739,7 +739,7 @@ See [Phase 3 → Phase 4 Migration Triggers](#phase-3--phase-4-migration-trigger
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                  PRODUCTION (us-east-1)                      │
+│                  PRODUCTION (us-east-2)                      │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │                        ALB                            │   │

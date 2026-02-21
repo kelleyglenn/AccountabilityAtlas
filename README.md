@@ -7,12 +7,14 @@ A multi-tier web application for geo-located video curation focused on constitut
 ```
 AccountabilityAtlas/
 ├── docs/                              # Architecture and design documentation
+├── infra/                             # OpenTofu (IaC) for AWS provisioning
 ├── scripts/
 │   ├── dev-start.sh                   # Start all services (local dev mode)
 │   ├── dev-stop.sh                    # Stop all services (local dev mode)
 │   ├── docker-start.sh                # Start all services (docker mode)
 │   ├── docker-stop.sh                 # Stop docker services
 │   ├── deploy.sh                      # Build, check, and redeploy individual services
+│   ├── aws/                           # AWS start, stop, and deploy scripts
 │   ├── lib/                           # Shared script utilities
 │   └── integration/                   # Cross-service integration tests
 ├── docker-compose.yml                 # Local multi-service development
@@ -78,6 +80,18 @@ Both modes start all services and open a browser to http://localhost:3000.
 ```
 
 Runs quality checks, builds Docker images, recreates the targeted containers, and waits for health checks to pass.
+
+## AWS Deployment
+
+Infrastructure is provisioned with OpenTofu and deployed via SSH to a single EC2 instance running Docker Compose. See [infra/README.md](infra/README.md) for bootstrap and setup instructions.
+
+```bash
+./scripts/aws/aws-deploy.sh   # Build images, push to ECR, deploy to EC2
+./scripts/aws/aws-start.sh    # Start EC2 + RDS instances
+./scripts/aws/aws-stop.sh     # Stop EC2 + RDS instances (saves cost)
+```
+
+See [docs/07-InfrastructureArchitecture.md](docs/07-InfrastructureArchitecture.md) for the full infrastructure architecture across deployment phases.
 
 ## Key Gradle Tasks
 
