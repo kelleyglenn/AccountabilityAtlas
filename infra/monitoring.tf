@@ -75,7 +75,7 @@ resource "aws_cloudwatch_metric_alarm" "ec2_status_check" {
   alarm_name          = "${var.project_name}-ec2-status-check"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
-  metric_name         = "StatusCheckFailed"
+  metric_name         = "StatusCheckFailed_System"
   namespace           = "AWS/EC2"
   period              = 300
   statistic           = "Maximum"
