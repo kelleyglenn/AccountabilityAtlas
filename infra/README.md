@@ -110,13 +110,88 @@ Copy output values into `scripts/aws/config.env`.
 
 ## 8. First Deployment
 
-Run the deploy script to build, push, and start all services:
+The first deployment requires several manual steps on the EC2 instance before running the deploy script.
+
+### 8a. Install tools on EC2
+
+SSH into the instance and install psql (for database init) and certbot (for TLS):
+
+```bash
+ssh -i ~/.ssh/accountabilityatlas-deploy ec2-user@<EC2_IP>
+sudo dnf install -y postgresql16 certbot
+```
+
+### 8b. Initialize databases
+
+Each service needs its own database and user in RDS. From the EC2 instance:
+
+```bash
+export PGHOST=<RDS_ENDPOINT_HOST>   # e.g. accountabilityatlas-db.xxx.us-east-2.rds.amazonaws.com
+export PGUSER=postgres
+export PGPASSWORD='<master_password>'
+```
+
+Run each statement individually (CREATE DATABASE cannot run inside a transaction on RDS). Replace `CHANGE_ME_DB_PASSWORD` with the password stored in Secrets Manager as `accountabilityatlas/db-password`:
+
+```bash
+# For each service (user_service, video_service, location_service, search_service, moderation_service):
+psql -d accountabilityatlas -c "CREATE USER user_service WITH PASSWORD 'CHANGE_ME_DB_PASSWORD';"
+psql -d accountabilityatlas -c "GRANT user_service TO postgres;"
+psql -d accountabilityatlas -c "CREATE DATABASE user_service OWNER user_service;"
+psql -d user_service -c "GRANT ALL ON SCHEMA public TO user_service;"
+# ... repeat for each service (see infra/docker/init-databases.sql for full list)
+```
+
+Note: location_service also needs PostGIS: `psql -d location_service -c "CREATE EXTENSION IF NOT EXISTS postgis;"`
+
+### 8c. Create bootstrap tag
+
+The deploy script requires an `integration-tested-*` tag. For the very first deployment (before any integration tests have run), create a bootstrap tag across all service repos:
+
+```bash
+TAG="integration-tested-$(date +%Y-%m-%d)-bootstrap"
+for repo in AcctAtlas-api-gateway AcctAtlas-user-service AcctAtlas-video-service \
+            AcctAtlas-location-service AcctAtlas-search-service \
+            AcctAtlas-moderation-service AcctAtlas-web-app; do
+    git -C "$repo" tag "$TAG"
+    git -C "$repo" push origin "$TAG"
+done
+```
+
+### 8d. Run deploy script
 
 ```bash
 ../scripts/aws/aws-deploy.sh
 ```
 
-The first deployment must also initialize per-service databases. See `infra/docker/init-databases.sql` for the SQL that creates each service's database and user.
+### 8e. Obtain TLS certificate
+
+Stop nginx (so certbot can use port 80), obtain the certificate, then start nginx:
+
+```bash
+ssh -i ~/.ssh/accountabilityatlas-deploy ec2-user@<EC2_IP>
+
+# Stop nginx to free port 80
+cd ~/app && docker compose stop nginx
+
+# Obtain certificate
+sudo certbot certonly --standalone \
+    -d accountabilityatlas.com -d www.accountabilityatlas.com \
+    --non-interactive --agree-tos --email admin@accountabilityatlas.com
+
+# Enable auto-renewal
+sudo systemctl enable --now certbot-renew.timer
+
+# Add hook to reload nginx after renewal
+sudo sh -c 'cat > /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh << "HOOK"
+#!/bin/bash
+docker compose -f /home/ec2-user/app/docker-compose.yml exec nginx nginx -s reload
+HOOK
+chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh'
+
+# Start nginx (certs now exist)
+docker compose up -d nginx
+```
 
 ## 9. Start/Stop
 
