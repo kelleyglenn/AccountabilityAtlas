@@ -1,11 +1,16 @@
-# Video Metadata Extraction CLI
+# Video Metadata Extraction Pipeline
 
-A Python CLI tool that extracts structured metadata from YouTube videos for AccountabilityAtlas seed data. It uses `yt-dlp` to fetch video metadata and auto-generated transcripts, then calls Claude to extract amendments, participants, dates, and locations.
+A two-script Python pipeline that extracts structured metadata from YouTube videos for AccountabilityAtlas seed data.
+
+1. **`fetch_youtube.py`** — fetches video metadata and transcripts via yt-dlp, outputs intermediate JSON
+2. **`claude_extract.py`** — reads intermediate JSON, calls Claude to extract amendments/participants/dates/locations, outputs seed-data format JSON
+
+Splitting the pipeline lets each phase run independently. If the Claude prompt changes or extraction fails, you don't need to re-fetch from YouTube.
 
 ## Prerequisites
 
 - Python 3.10+
-- `ANTHROPIC_API_KEY` environment variable set with a valid Anthropic API key
+- `ANTHROPIC_API_KEY` environment variable set (only needed for `claude_extract.py`)
 
 ## Installation
 
@@ -22,80 +27,134 @@ source .venv/bin/activate  # On Windows Git Bash: source .venv/Scripts/activate
 pip install -r requirements.txt
 ```
 
-## Usage
+## Pipeline Usage
 
-### Single URL
-
-Prints JSON to stdout:
+### Full pipeline: URL list → YouTube data → seed data
 
 ```bash
-python extract.py "https://www.youtube.com/watch?v=VIDEO_ID"
+# 1. (Optional) Generate URL list from a YouTube channel
+python ../list-channel/list_channel.py CHANNEL_ID > urls.txt
+
+# 2. Fetch YouTube metadata + transcripts
+python fetch_youtube.py --file urls.txt --output youtube-data.json
+
+# 3. Extract structured metadata via Claude
+python claude_extract.py --input youtube-data.json --output seed-data/videos.json
 ```
 
-### Bulk Processing
-
-Process a file of URLs (one per line) and write results to a JSON file:
+### Single URL (quick test)
 
 ```bash
-python extract.py --file urls.txt --output seed-data/videos.json
+# Fetch metadata to stdout
+python fetch_youtube.py "https://www.youtube.com/watch?v=VIDEO_ID"
+
+# Or pipe directly to claude_extract.py
+python fetch_youtube.py "https://www.youtube.com/watch?v=VIDEO_ID" --output single.json
+python claude_extract.py --input single.json
 ```
 
-### Append to Existing File
+## fetch_youtube.py
 
-Add new entries to an existing JSON array file without overwriting:
+Fetches video metadata and auto-generated transcripts from YouTube using yt-dlp.
+
+### Usage
 
 ```bash
-python extract.py --file more-urls.txt --output seed-data/videos.json --append
+# Single URL (prints JSON to stdout)
+python fetch_youtube.py "https://www.youtube.com/watch?v=VIDEO_ID"
+
+# Bulk from file
+python fetch_youtube.py --file urls.txt --output youtube-data.json
+
+# Skip transcripts (faster)
+python fetch_youtube.py --file urls.txt --output youtube-data.json --no-transcript
+
+# Resume interrupted batch (skips already-fetched URLs)
+python fetch_youtube.py --file urls.txt --output youtube-data.json --append
 ```
 
-### Skip Transcript
+### CLI Reference
 
-Faster extraction using only title and description (lower confidence scores):
+```
+usage: fetch_youtube.py [-h] [--file FILE] [--output OUTPUT] [--no-transcript]
+                        [--append]
+                        [url]
+
+positional arguments:
+  url                   Single YouTube URL to process.
+
+options:
+  -h, --help            show this help message and exit
+  --file FILE, -f FILE  Path to a text file with one YouTube URL per line.
+  --output OUTPUT, -o OUTPUT
+                        Output file path for JSON results.
+  --no-transcript       Skip transcript fetch (faster, but less data for extraction).
+  --append, -a          Append to existing output file, skipping URLs already present.
+```
+
+### Intermediate JSON Format
+
+Output is a JSON array where each element has:
+
+```json
+{
+  "url": "https://www.youtube.com/watch?v=VIDEO_ID",
+  "title": "Video Title",
+  "description": "Full YouTube description",
+  "channel": "Channel Name",
+  "thumbnail": "https://i.ytimg.com/.../maxresdefault.jpg",
+  "duration": 1234,
+  "published": "20240315",
+  "transcript": "Full transcript text or null"
+}
+```
+
+## claude_extract.py
+
+Reads intermediate JSON from `fetch_youtube.py` and calls Claude to extract structured metadata in the seed-data format.
+
+### Usage
 
 ```bash
-python extract.py --no-transcript "https://www.youtube.com/watch?v=VIDEO_ID"
+# Sequential processing
+python claude_extract.py --input youtube-data.json --output seed-data/videos.json
+
+# Batch API (50% cost savings, async processing)
+python claude_extract.py --input youtube-data.json --output videos.json --batch
+
+# Resume interrupted extraction (skips already-processed URLs)
+python claude_extract.py --input youtube-data.json --output videos.json --append
+
+# Custom model
+python claude_extract.py --input youtube-data.json --output videos.json --model claude-sonnet-4-20250514
+
+# Combine flags
+python claude_extract.py --input youtube-data.json --output videos.json --batch --append
 ```
 
-### Batch Processing
+Batch processing uses the [Message Batches API](https://docs.anthropic.com/en/docs/build-with-claude/batch-processing) and may take minutes to hours depending on queue depth. The CLI polls for completion and prints progress updates.
 
-Use the [Message Batches API](https://docs.anthropic.com/en/docs/build-with-claude/batch-processing) for **50% cost savings** on bulk processing. Requests are submitted as a single batch and processed asynchronously:
-
-```bash
-python extract.py --file urls.txt --output seed-data/videos.json --batch
-```
-
-Batch processing may take minutes to hours depending on queue depth. The CLI polls for completion and prints progress updates. The output format is identical to sequential mode.
-
-The `--batch` flag can be combined with other options:
-
-```bash
-python extract.py --file urls.txt --output videos.json --batch --append --no-transcript
-```
-
-### Custom Model
-
-Override the default Claude model:
-
-```bash
-python extract.py --model claude-sonnet-4-20250514 "https://www.youtube.com/watch?v=VIDEO_ID"
-```
-
-## URL File Format
-
-One URL per line. Blank lines and lines starting with `#` are ignored:
+### CLI Reference
 
 ```
-# First Amendment audit videos
-https://www.youtube.com/watch?v=abc123
-https://www.youtube.com/watch?v=def456
+usage: claude_extract.py [-h] --input INPUT [--output OUTPUT] [--model MODEL]
+                         [--batch] [--append]
 
-# Police encounter videos
-https://www.youtube.com/watch?v=ghi789
+options:
+  -h, --help            show this help message and exit
+  --input INPUT, -i INPUT
+                        Input JSON file from fetch_youtube.py.
+  --output OUTPUT, -o OUTPUT
+                        Output file path for JSON results.
+  --model MODEL, -m MODEL
+                        Claude model to use (default: claude-haiku-4-5-20251001).
+  --batch, -b           Use the Message Batches API for 50% cost savings.
+  --append, -a          Append to existing output file, skipping URLs already present.
 ```
 
-## Output Format
+### Seed-Data Output Format
 
-Each entry in the output JSON array follows this schema:
+Each entry in the output JSON array:
 
 ```json
 {
@@ -148,34 +207,32 @@ Each entry in the output JSON array follows this schema:
 
 See [docs/llm-extraction-prompt.md](../../docs/llm-extraction-prompt.md) for the full extraction prompt specification, valid enum values, and extraction rules.
 
+## URL File Format
+
+One URL per line. Blank lines and lines starting with `#` are ignored:
+
+```
+# First Amendment audit videos
+https://www.youtube.com/watch?v=abc123
+https://www.youtube.com/watch?v=def456
+
+# Police encounter videos
+https://www.youtube.com/watch?v=ghi789
+```
+
 ## How It Works
+
+### fetch_youtube.py
 
 1. **Fetch metadata**: Uses the `yt-dlp` Python library to extract video title, description, publication date, channel, thumbnail, and duration without downloading the video.
 2. **Fetch transcript**: Optionally retrieves auto-generated English subtitles and parses them into plain text.
-3. **Call Claude**: Sends the extraction prompt with XML-tagged video data, following the shared extraction prompt spec from [`docs/llm-extraction-prompt.md`](../../docs/llm-extraction-prompt.md). In sequential mode, this is a user-only prompt (no system prompt) identical to the Java video-service. In batch mode (`--batch`), the shared instructions are sent as a system message with `cache_control` for prompt caching, and only the per-video data is in the user message. Claude responds with XML thinking tags (multi-step analysis) followed by the final JSON object.
-4. **Parse response**: Extracts the last balanced JSON object from the response (skipping the XML thinking tags), matching the Java service's parsing logic.
-5. **Combine results**: Merges YouTube metadata with Claude's extracted fields into the seed-data format.
+3. **Output**: Writes intermediate JSON with all YouTube data for downstream processing.
+
+### claude_extract.py
+
+1. **Read input**: Loads intermediate JSON from `fetch_youtube.py`.
+2. **Call Claude**: Sends the extraction prompt with XML-tagged video data, following the shared extraction prompt spec from [`docs/llm-extraction-prompt.md`](../../docs/llm-extraction-prompt.md). In sequential mode, this is a user-only prompt (no system prompt) identical to the Java video-service. In batch mode (`--batch`), the shared instructions are sent as a system message with `cache_control` for prompt caching, and only the per-video data is in the user message. Claude responds with XML thinking tags (multi-step analysis) followed by the final JSON object.
+3. **Parse response**: Extracts the last balanced JSON object from the response (skipping the XML thinking tags), matching the Java service's parsing logic.
+4. **Combine results**: Merges YouTube metadata with Claude's extracted fields into the seed-data format.
 
 If a transcript is unavailable, the tool falls back to extracting from title and description only, which typically produces lower confidence scores.
-
-## CLI Reference
-
-```
-usage: extract.py [-h] [--file FILE] [--output OUTPUT] [--model MODEL]
-                  [--no-transcript] [--append] [--batch]
-                  [url]
-
-positional arguments:
-  url                   Single YouTube URL to process.
-
-options:
-  -h, --help            show this help message and exit
-  --file FILE, -f FILE  Path to a text file with one YouTube URL per line.
-  --output OUTPUT, -o OUTPUT
-                        Output file path for JSON results.
-  --model MODEL, -m MODEL
-                        Claude model to use (default: claude-haiku-4-5-20251001).
-  --no-transcript       Skip transcript fetch (faster, less accurate).
-  --append, -a          Append to existing output file instead of overwriting.
-  --batch, -b           Use Message Batches API for 50% cost savings (requires --file).
-```

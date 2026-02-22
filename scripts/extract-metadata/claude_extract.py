@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
 """
-Video metadata extraction CLI for AccountabilityAtlas.
+Claude LLM metadata extraction for AccountabilityAtlas.
 
-Uses yt-dlp to fetch YouTube metadata and auto-generated transcripts,
-then calls Claude to extract structured metadata matching the seed-data format.
+Reads intermediate JSON from fetch_youtube.py and uses Claude to extract
+structured metadata (amendments, participants, dates, locations) in
+the seed-data format.
 
 Usage:
-    python extract.py <url>
-    python extract.py --file urls.txt --output seed-data/videos.json
-    python extract.py --file urls.txt --output videos.json --append
-    python extract.py --file urls.txt --output videos.json --batch
-    python extract.py <url> --no-transcript
-    python extract.py <url> --model claude-sonnet-4-20250514
+    python claude_extract.py --input youtube-data.json --output seed-data/videos.json
+    python claude_extract.py --input youtube-data.json --output videos.json --batch
+    python claude_extract.py --input youtube-data.json --output videos.json --append
+    python claude_extract.py --input youtube-data.json --output videos.json --model claude-sonnet-4-20250514
 """
 
 import argparse
 import json
-import re
 import sys
 import time
 from pathlib import Path
@@ -26,16 +24,6 @@ try:
 except ImportError:
     print(
         "Error: 'anthropic' package is not installed. "
-        "Run: pip install -r requirements.txt",
-        file=sys.stderr,
-    )
-    sys.exit(1)
-
-try:
-    import yt_dlp
-except ImportError:
-    print(
-        "Error: 'yt-dlp' package is not installed. "
         "Run: pip install -r requirements.txt",
         file=sys.stderr,
     )
@@ -341,206 +329,18 @@ def _fill_template(
     )
 
 
-# --- YouTube fetching ---
-
-
-def fetch_youtube_metadata(url: str, include_transcript: bool = True) -> dict:
-    """Fetch video metadata and optionally transcript from YouTube using yt-dlp.
-
-    Args:
-        url: YouTube video URL.
-        include_transcript: Whether to attempt fetching auto-generated subtitles.
-
-    Returns:
-        Dictionary with keys: url, title, description, channel, thumbnail,
-        duration, published (str or None), transcript (str or None).
-    """
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-        "format": "best",
-        "sleep_requests": 0.75,
-        "sleep_interval": 2,
-    }
-
-    if include_transcript:
-        ydl_opts.update(
-            {
-                "writeautomaticsub": True,
-                "writesubtitles": True,
-                "subtitleslangs": ["en"],
-                "subtitlesformat": "json3",
-                "sleep_subtitles": 5,
-            }
-        )
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-
-    transcript = None
-    if include_transcript:
-        transcript = _extract_transcript(info)
-
-    thumbnail = _pick_best_thumbnail(info)
-
-    return {
-        "url": info.get("webpage_url") or url,
-        "title": info.get("title", ""),
-        "description": info.get("description", ""),
-        "channel": info.get("channel") or info.get("uploader", ""),
-        "thumbnail": thumbnail,
-        "duration": info.get("duration"),
-        "published": info.get("upload_date"),
-        "transcript": transcript,
-    }
-
-
-def _extract_transcript(info: dict) -> str | None:
-    """Extract transcript text from yt-dlp subtitle data.
-
-    yt-dlp stores fetched subtitles under 'requested_subtitles' when available.
-    The json3 format contains an 'events' list with 'segs' (segments) containing 'utf8' text.
-    Falls back to vtt/srv format text parsing if json3 is unavailable.
-    """
-    subs = info.get("requested_subtitles") or {}
-    en_sub = subs.get("en")
-    if not en_sub:
-        return None
-
-    # If yt-dlp returned the subtitle data directly (json3 format)
-    sub_data = en_sub.get("data")
-    if sub_data:
-        return _parse_subtitle_data(sub_data, en_sub.get("ext", ""))
-
-    # If yt-dlp provided a URL but no inline data, we need to fetch it
-    sub_url = en_sub.get("url")
-    if sub_url:
-        import urllib.request
-
-        for attempt in range(3):
-            try:
-                with urllib.request.urlopen(sub_url, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                return _parse_subtitle_data(raw, en_sub.get("ext", ""))
-            except urllib.error.HTTPError as e:
-                if e.code == 429 and attempt < 2:
-                    wait = 5 * (attempt + 1)
-                    print(
-                        f"  Subtitle fetch rate-limited, retrying in {wait}s...",
-                        file=sys.stderr,
-                    )
-                    time.sleep(wait)
-                else:
-                    print(f"  Subtitle fetch failed: {e}", file=sys.stderr)
-                    return None
-            except Exception as e:
-                print(f"  Subtitle fetch failed: {e}", file=sys.stderr)
-                return None
-
-    return None
-
-
-def _parse_subtitle_data(data: str, ext: str) -> str | None:
-    """Parse subtitle data from various formats into plain text."""
-    if ext == "json3":
-        try:
-            parsed = json.loads(data)
-            segments = []
-            for event in parsed.get("events", []):
-                for seg in event.get("segs", []):
-                    text = seg.get("utf8", "").strip()
-                    if text and text != "\n":
-                        segments.append(text)
-            if segments:
-                return " ".join(segments)
-        except (json.JSONDecodeError, KeyError):
-            pass
-
-    # Fallback: strip timing lines from vtt/srv formats
-    lines = []
-    for line in data.splitlines():
-        line = line.strip()
-        # Skip empty lines, timing lines, WEBVTT headers, and numeric cue IDs
-        if not line:
-            continue
-        if "-->" in line:
-            continue
-        if line.startswith("WEBVTT") or line.startswith("Kind:") or line.startswith("Language:"):
-            continue
-        if line.isdigit():
-            continue
-        # Remove HTML-style tags (e.g. <c>, </c>, <00:01:02.345>)
-        clean = re.sub(r"<[^>]+>", "", line)
-        if clean.strip():
-            lines.append(clean.strip())
-
-    if lines:
-        # Deduplicate consecutive identical lines (common in vtt)
-        deduped = [lines[0]]
-        for ln in lines[1:]:
-            if ln != deduped[-1]:
-                deduped.append(ln)
-        return " ".join(deduped)
-
-    return None
-
-
-def _pick_best_thumbnail(info: dict) -> str | None:
-    """Select the best thumbnail URL from yt-dlp info.
-
-    Prefers maxresdefault, then high-quality thumbnails, then whatever is available.
-    """
-    thumbnails = info.get("thumbnails") or []
-    thumbnail = info.get("thumbnail")
-
-    if not thumbnails:
-        return thumbnail
-
-    # Prefer known high-quality YouTube thumbnail names
-    for t in thumbnails:
-        url = t.get("url", "")
-        if "maxresdefault" in url:
-            return url
-
-    for t in thumbnails:
-        url = t.get("url", "")
-        if "hqdefault" in url or "sddefault" in url:
-            return url
-
-    # Fall back to highest resolution available
-    best = max(
-        (t for t in thumbnails if t.get("width")),
-        key=lambda t: (t.get("width", 0) * t.get("height", 0)),
-        default=None,
-    )
-    if best:
-        return best.get("url")
-
-    return thumbnail
-
-
 # --- Message building ---
 
 
 def build_user_message(title: str, description: str, published: str | None, transcript: str | None) -> str:
-    """Build the user message for Claude following the shared prompt spec.
-
-    Uses USER_PROMPT_TEMPLATE with the same structure as the Java video-service.
-    When a transcript is available, it is inserted as an additional XML-tagged section.
-    """
+    """Build the user message for Claude following the shared prompt spec."""
     return _fill_template(USER_PROMPT_TEMPLATE, title, description, published, transcript)
 
 
 def build_batch_user_message(
     title: str, description: str, published: str | None, transcript: str | None
 ) -> str:
-    """Build the per-video user message for batch mode.
-
-    Uses BATCH_USER_TEMPLATE which contains only the video data XML tags
-    and a brief instruction. The shared extraction instructions are in the
-    system message (BATCH_SYSTEM_PROMPT) for prompt caching optimization.
-    """
+    """Build the per-video user message for batch mode."""
     return _fill_template(BATCH_USER_TEMPLATE, title, description, published, transcript)
 
 
@@ -593,12 +393,9 @@ def extract_metadata_with_claude(
 ) -> dict:
     """Call Claude to extract structured metadata from video information.
 
-    Uses the same user-only prompt as the Java video-service, with an
-    additional transcript section when available. See docs/llm-extraction-prompt.md.
-
     Args:
         client: Anthropic client instance.
-        youtube_data: Dictionary from fetch_youtube_metadata().
+        youtube_data: Dictionary from fetch_youtube.py intermediate JSON.
         model: Claude model ID to use.
 
     Returns:
@@ -631,15 +428,9 @@ def extract_metadata_with_claude(
 
 
 def build_output_entry(url: str, youtube_data: dict, claude_metadata: dict) -> dict:
-    """Combine YouTube metadata and Claude extraction into the seed-data format.
-
-    Returns a dictionary matching the expected output schema with youtubeUrl,
-    title, description, channelName, thumbnailUrl, durationSeconds, and all
-    Claude-extracted fields.
-    """
+    """Combine YouTube metadata and Claude extraction into the seed-data format."""
     location = claude_metadata.get("location")
     if location is not None:
-        # Ensure all expected location fields exist
         location = {
             "name": location.get("name"),
             "streetAddress": location.get("streetAddress"),
@@ -672,33 +463,22 @@ def build_output_entry(url: str, youtube_data: dict, claude_metadata: dict) -> d
     }
 
 
-def process_single_url(
-    url: str,
+def process_single(
+    youtube_data: dict,
     client: anthropic.Anthropic,
     model: str,
-    include_transcript: bool,
 ) -> dict:
-    """Process a single YouTube URL end-to-end.
+    """Process a single video entry through Claude extraction.
 
     Args:
-        url: YouTube video URL.
+        youtube_data: Dictionary from fetch_youtube.py intermediate JSON.
         client: Anthropic client instance.
         model: Claude model ID.
-        include_transcript: Whether to fetch transcript.
 
     Returns:
         Output entry dictionary in seed-data format.
     """
-    print(f"Fetching metadata for: {url}", file=sys.stderr)
-    youtube_data = fetch_youtube_metadata(url, include_transcript=include_transcript)
-
-    has_transcript = youtube_data.get("transcript") is not None
-    if include_transcript and not has_transcript:
-        print(
-            "  Warning: No transcript available. Extracting from title+description only.",
-            file=sys.stderr,
-        )
-
+    url = youtube_data.get("url", "")
     print(f"  Calling Claude ({model})...", file=sys.stderr)
     claude_metadata = extract_metadata_with_claude(client, youtube_data, model=model)
 
@@ -707,55 +487,34 @@ def process_single_url(
     return entry
 
 
-def process_urls_batch(
-    urls: list[str],
+def process_batch(
+    youtube_data_list: list[dict],
     client: anthropic.Anthropic,
     model: str,
-    include_transcript: bool,
 ) -> tuple[list[dict], list[str]]:
-    """Process multiple URLs using the Message Batches API for 50% cost savings.
+    """Process multiple videos using the Message Batches API for 50% cost savings.
 
     Submits all requests as a single batch and polls for completion.
     The prompt is split into a shared system message (with cache_control)
     and per-video user messages to maximize prompt caching hits.
 
     Args:
-        urls: List of YouTube video URLs.
+        youtube_data_list: List of dictionaries from fetch_youtube.py intermediate JSON.
         client: Anthropic client instance.
         model: Claude model ID.
-        include_transcript: Whether to fetch transcripts.
 
     Returns:
         Tuple of (results list, errors list).
     """
-    # Phase 1: Fetch YouTube metadata for all URLs
-    youtube_data = {}
-    for i, url in enumerate(urls, 1):
-        print(f"\n[{i}/{len(urls)}] Fetching metadata for: {url}", file=sys.stderr)
-        try:
-            youtube_data[url] = fetch_youtube_metadata(url, include_transcript=include_transcript)
-            has_transcript = youtube_data[url].get("transcript") is not None
-            if include_transcript and not has_transcript:
-                print(
-                    "  Warning: No transcript available. Will extract from title+description only.",
-                    file=sys.stderr,
-                )
-        except Exception as e:
-            print(f"  Error fetching metadata: {e}", file=sys.stderr)
-            # Skip this URL entirely — can't submit to batch without metadata
-
-    if not youtube_data:
-        return [], [f"Failed to fetch metadata for all {len(urls)} URLs"]
-
-    # Phase 2: Build and submit the batch
-    print(f"\nSubmitting batch of {len(youtube_data)} requests...", file=sys.stderr)
+    print(f"\nSubmitting batch of {len(youtube_data_list)} requests...", file=sys.stderr)
 
     requests = []
-    # custom_id must be [a-zA-Z0-9_-]{1,64} — use video ID, map back to URL
-    id_to_url = {}
-    for url, yt_data in youtube_data.items():
-        video_id = url.split("watch?v=")[-1].split("&")[0] if "watch?v=" in url else url
-        id_to_url[video_id] = url
+    # custom_id must be [a-zA-Z0-9_-]{1,64} — use video ID, map back to index
+    id_to_index = {}
+    for idx, yt_data in enumerate(youtube_data_list):
+        url = yt_data.get("url", "")
+        video_id = url.split("watch?v=")[-1].split("&")[0] if "watch?v=" in url else f"idx-{idx}"
+        id_to_index[video_id] = idx
 
         user_message = build_batch_user_message(
             title=yt_data["title"],
@@ -787,7 +546,7 @@ def process_urls_batch(
     batch = client.messages.batches.create(requests=requests)
     print(f"Batch created: {batch.id}", file=sys.stderr)
 
-    # Phase 3: Poll for completion
+    # Poll for completion
     while batch.processing_status != "ended":
         counts = batch.request_counts
         print(
@@ -810,20 +569,26 @@ def process_urls_batch(
         file=sys.stderr,
     )
 
-    # Phase 4: Retrieve and process results
+    # Retrieve and process results
     results = []
     errors = []
 
     for entry in client.messages.batches.results(batch.id):
         video_id = entry.custom_id
-        url = id_to_url.get(video_id, video_id)
+        idx = id_to_index.get(video_id)
+        if idx is None:
+            errors.append(f"Unknown custom_id in batch response: {video_id}")
+            continue
+        yt_data = youtube_data_list[idx]
+        url = yt_data.get("url", video_id)
+
         if entry.result.type == "succeeded":
             try:
                 raw_text = entry.result.message.content[0].text.strip()
                 json_str = _extract_json(raw_text)
                 claude_metadata = json.loads(json_str)
-                results.append(build_output_entry(url, youtube_data[url], claude_metadata))
-                print(f"  Processed: {youtube_data[url].get('title', url)}", file=sys.stderr)
+                results.append(build_output_entry(url, yt_data, claude_metadata))
+                print(f"  Processed: {yt_data.get('title', url)}", file=sys.stderr)
             except (json.JSONDecodeError, IndexError, KeyError) as e:
                 errors.append(f"Failed to parse response for {url}: {e}")
         elif entry.result.type == "errored":
@@ -834,29 +599,20 @@ def process_urls_batch(
         elif entry.result.type == "canceled":
             errors.append(f"Request canceled for {url}")
 
-    # Also count URLs that failed metadata fetch
-    for url in urls:
-        if url not in youtube_data:
-            errors.append(f"Failed to fetch YouTube metadata for {url}")
-
     return results, errors
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Extract structured metadata from YouTube videos for AccountabilityAtlas.",
+        description="Extract structured metadata from YouTube data using Claude for AccountabilityAtlas.",
         epilog="Requires ANTHROPIC_API_KEY environment variable to be set.",
     )
     parser.add_argument(
-        "url",
-        nargs="?",
-        help="Single YouTube URL to process.",
-    )
-    parser.add_argument(
-        "--file",
-        "-f",
+        "--input",
+        "-i",
         type=str,
-        help="Path to a text file with one YouTube URL per line.",
+        required=True,
+        help="Input JSON file from fetch_youtube.py.",
     )
     parser.add_argument(
         "--output",
@@ -872,56 +628,48 @@ def main():
         help=f"Claude model to use (default: {DEFAULT_MODEL}).",
     )
     parser.add_argument(
-        "--no-transcript",
+        "--batch",
+        "-b",
         action="store_true",
-        help="Skip transcript fetch (faster, but less accurate extraction).",
+        help="Use the Message Batches API for 50%% cost savings.",
     )
     parser.add_argument(
         "--append",
         "-a",
         action="store_true",
-        help="Append to existing output file instead of overwriting.",
-    )
-    parser.add_argument(
-        "--batch",
-        "-b",
-        action="store_true",
-        help=(
-            "Use the Message Batches API for bulk processing (requires --file). "
-            "Submits all requests as a single batch for 50%% cost savings."
-        ),
+        help="Append to existing output file, skipping URLs already present.",
     )
 
     args = parser.parse_args()
 
     # Validate arguments
-    if not args.url and not args.file:
-        parser.error("Provide either a URL argument or --file with a file of URLs.")
-    if args.url and args.file:
-        parser.error("Provide either a URL argument or --file, not both.")
     if args.append and not args.output:
         parser.error("--append requires --output.")
-    if args.batch and not args.file:
-        parser.error("--batch requires --file.")
 
-    # Collect URLs
-    urls = []
-    if args.url:
-        urls.append(args.url.strip())
-    else:
-        file_path = Path(args.file)
-        if not file_path.exists():
-            print(f"Error: File not found: {args.file}", file=sys.stderr)
-            sys.exit(1)
-        with open(file_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    urls.append(line)
-
-    if not urls:
-        print("Error: No URLs to process.", file=sys.stderr)
+    # Load input data
+    input_path = Path(args.input)
+    if not input_path.exists():
+        print(f"Error: Input file not found: {args.input}", file=sys.stderr)
         sys.exit(1)
+
+    try:
+        with open(input_path, "r", encoding="utf-8") as f:
+            youtube_data_list = json.load(f)
+        if not isinstance(youtube_data_list, list):
+            print(
+                f"Error: Input file {args.input} does not contain a JSON array.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Failed to parse input file {args.input}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if not youtube_data_list:
+        print("Error: Input file contains no entries.", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Loaded {len(youtube_data_list)} entries from {args.input}.", file=sys.stderr)
 
     # Initialize Anthropic client
     try:
@@ -933,10 +681,9 @@ def main():
         )
         sys.exit(1)
 
-    include_transcript = not args.no_transcript
-
     # Load existing entries if appending
     existing_entries = []
+    existing_urls = set()
     if args.append and args.output:
         output_path = Path(args.output)
         if output_path.exists():
@@ -949,6 +696,7 @@ def main():
                         file=sys.stderr,
                     )
                     sys.exit(1)
+                existing_urls = {entry.get("youtubeUrl") for entry in existing_entries}
                 print(
                     f"Loaded {len(existing_entries)} existing entries from {args.output}.",
                     file=sys.stderr,
@@ -960,21 +708,36 @@ def main():
                 )
                 sys.exit(1)
 
-    # Process URLs
+    # Filter out already-processed entries when appending
+    if existing_urls:
+        original_count = len(youtube_data_list)
+        youtube_data_list = [
+            d for d in youtube_data_list if d.get("url") not in existing_urls
+        ]
+        skipped = original_count - len(youtube_data_list)
+        if skipped:
+            print(f"Skipping {skipped} already-extracted URL(s).", file=sys.stderr)
+
+    if not youtube_data_list and existing_entries:
+        print("All entries already extracted. Nothing to do.", file=sys.stderr)
+        sys.exit(0)
+
+    # Process entries
     results = list(existing_entries)
     errors = []
 
     if args.batch:
-        batch_results, batch_errors = process_urls_batch(
-            urls, client, args.model, include_transcript
+        batch_results, batch_errors = process_batch(
+            youtube_data_list, client, args.model
         )
         results.extend(batch_results)
         errors.extend(batch_errors)
     else:
-        for i, url in enumerate(urls, 1):
-            print(f"\n[{i}/{len(urls)}]", file=sys.stderr)
+        for i, yt_data in enumerate(youtube_data_list, 1):
+            url = yt_data.get("url", "unknown")
+            print(f"\n[{i}/{len(youtube_data_list)}] Processing: {url}", file=sys.stderr)
             try:
-                entry = process_single_url(url, client, args.model, include_transcript)
+                entry = process_single(yt_data, client, args.model)
                 results.append(entry)
             except Exception as e:
                 error_msg = f"Failed to process {url}: {e}"
@@ -1002,7 +765,7 @@ def main():
             print(f"  - {err}", file=sys.stderr)
         sys.exit(1 if new_count == 0 else 0)
     else:
-        print(f"\nSuccessfully processed {new_count} URL(s).", file=sys.stderr)
+        print(f"\nSuccessfully processed {new_count} entry(ies).", file=sys.stderr)
 
 
 if __name__ == "__main__":
