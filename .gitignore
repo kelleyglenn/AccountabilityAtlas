@@ -24,6 +24,7 @@ target/
 out/
 .gradle/
 node_modules/
+__pycache__/
 
 # Environment files
 .env

@@ -10,7 +10,9 @@ Both implementations **must** follow this specification to ensure consistent ext
 
 ## Prompt Structure
 
-The extraction uses a **user-only prompt** (no system prompt). The prompt includes XML-tagged video data, detailed classification instructions, and a multi-step analytical process that produces XML thinking tags followed by the final JSON output.
+The extraction uses a **user-only prompt** (no system prompt) for both the Java video-service and the Python CLI's default sequential mode. The prompt includes XML-tagged video data, detailed classification instructions, and a multi-step analytical process that produces XML thinking tags followed by the final JSON output.
+
+**Batch mode optimization (Python CLI only):** When the CLI is invoked with `--batch`, the prompt is split into a **system message** (shared instructions with `cache_control: {"type": "ephemeral"}`) and a **user message** (per-video XML data only). This reordering maximizes prompt caching hits across batch requests — all requests share the same cached system prompt, with only the video-specific data varying. The prompt content is identical; only the structure differs.
 
 ### Template Variables
 

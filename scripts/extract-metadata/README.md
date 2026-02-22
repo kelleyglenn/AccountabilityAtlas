@@ -56,6 +56,22 @@ Faster extraction using only title and description (lower confidence scores):
 python extract.py --no-transcript "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
+### Batch Processing
+
+Use the [Message Batches API](https://docs.anthropic.com/en/docs/build-with-claude/batch-processing) for **50% cost savings** on bulk processing. Requests are submitted as a single batch and processed asynchronously:
+
+```bash
+python extract.py --file urls.txt --output seed-data/videos.json --batch
+```
+
+Batch processing may take minutes to hours depending on queue depth. The CLI polls for completion and prints progress updates. The output format is identical to sequential mode.
+
+The `--batch` flag can be combined with other options:
+
+```bash
+python extract.py --file urls.txt --output videos.json --batch --append --no-transcript
+```
+
 ### Custom Model
 
 Override the default Claude model:
@@ -135,7 +151,7 @@ See [docs/llm-extraction-prompt.md](../../docs/llm-extraction-prompt.md) for the
 
 1. **Fetch metadata**: Uses the `yt-dlp` Python library to extract video title, description, publication date, channel, thumbnail, and duration without downloading the video.
 2. **Fetch transcript**: Optionally retrieves auto-generated English subtitles and parses them into plain text.
-3. **Call Claude**: Sends a user-only prompt (no system prompt) with XML-tagged video data, following the shared extraction prompt spec from [`docs/llm-extraction-prompt.md`](../../docs/llm-extraction-prompt.md). The prompt is identical to the Java video-service's `/videos/extract` endpoint, with the addition of an optional `<transcript>` section. Claude responds with XML thinking tags (multi-step analysis) followed by the final JSON object.
+3. **Call Claude**: Sends the extraction prompt with XML-tagged video data, following the shared extraction prompt spec from [`docs/llm-extraction-prompt.md`](../../docs/llm-extraction-prompt.md). In sequential mode, this is a user-only prompt (no system prompt) identical to the Java video-service. In batch mode (`--batch`), the shared instructions are sent as a system message with `cache_control` for prompt caching, and only the per-video data is in the user message. Claude responds with XML thinking tags (multi-step analysis) followed by the final JSON object.
 4. **Parse response**: Extracts the last balanced JSON object from the response (skipping the XML thinking tags), matching the Java service's parsing logic.
 5. **Combine results**: Merges YouTube metadata with Claude's extracted fields into the seed-data format.
 
@@ -145,7 +161,7 @@ If a transcript is unavailable, the tool falls back to extracting from title and
 
 ```
 usage: extract.py [-h] [--file FILE] [--output OUTPUT] [--model MODEL]
-                  [--no-transcript] [--append]
+                  [--no-transcript] [--append] [--batch]
                   [url]
 
 positional arguments:
@@ -160,4 +176,5 @@ options:
                         Claude model to use (default: claude-haiku-4-5-20251001).
   --no-transcript       Skip transcript fetch (faster, less accurate).
   --append, -a          Append to existing output file instead of overwriting.
+  --batch, -b           Use Message Batches API for 50% cost savings (requires --file).
 ```
