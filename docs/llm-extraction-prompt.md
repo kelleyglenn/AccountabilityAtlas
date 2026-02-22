@@ -6,7 +6,7 @@ Both implementations **must** follow this specification to ensure consistent ext
 
 ## Model
 
-`claude-sonnet-4-6` — chosen for its stronger reasoning and analysis capabilities compared to Haiku, which produces more accurate classification of amendments, participants, and locations.
+`claude-haiku-4-5-20251001` — chosen for speed and cost efficiency. Haiku provides adequate accuracy for metadata extraction while delivering significantly faster response times than Sonnet.
 
 ## Prompt Structure
 
