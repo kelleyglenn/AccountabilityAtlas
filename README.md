@@ -17,6 +17,7 @@ AccountabilityAtlas/
 │   ├── seed-videos.sh                 # Seed videos from JSON into the running stack
 │   ├── aws/                           # AWS start, stop, and deploy scripts
 │   ├── extract-metadata/              # Python CLI for AI-powered video metadata extraction
+│   ├── list-channel/                  # Python CLI to list video URLs from a YouTube channel
 │   ├── lib/                           # Shared script utilities
 │   └── integration/                   # Cross-service integration tests
 ├── seed-data/                         # Generated seed data (JSON, not committed)
@@ -100,6 +101,7 @@ See [docs/07-InfrastructureArchitecture.md](docs/07-InfrastructureArchitecture.m
 
 The project includes tools for AI-powered extraction of video metadata (amendments, participants, location, date) using Claude:
 
+- **`scripts/list-channel/`** — Python CLI that lists video URLs from a YouTube channel using yt-dlp, with date and duration filtering (excludes Shorts). Output is compatible with `extract.py --file`. See [scripts/list-channel/README.md](scripts/list-channel/README.md).
 - **`scripts/extract-metadata/`** — Python CLI that uses yt-dlp and the Anthropic SDK to extract metadata from YouTube videos, including optional transcript analysis. See [scripts/extract-metadata/README.md](scripts/extract-metadata/README.md).
 - **`scripts/seed-videos.sh`** — Seeds videos from a JSON file into the running stack via the API. Reads output from the extract CLI.
 - **`/api/v1/videos/extract`** — Video-service REST endpoint for real-time extraction (title + description only, no transcript).
