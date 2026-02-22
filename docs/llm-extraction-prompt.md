@@ -19,7 +19,17 @@ The extraction uses a **user-only prompt** (no system prompt). The prompt includ
 | `{{title}}` | YouTube API `snippet.title` | Video title |
 | `{{description}}` | YouTube API `snippet.description` | Video description |
 | `{{published}}` | YouTube API `snippet.publishedAt` | Publication date (used as reference for relative date calculations) |
-| `{{transcript_section}}` | yt-dlp auto-subtitles (Python CLI only) | Optional `<transcript>...</transcript>` XML block inserted after `<publication_date>`. The Java video-service does not have access to transcripts, so this variable is empty. |
+| `{{transcript_section}}` | yt-dlp auto-subtitles (Python CLI only) | Optional transcript block inserted after `<publication_date>`. Empty string when no transcript is available (including all Java video-service calls). See expansion below. |
+
+When a transcript is available, `{{transcript_section}}` expands to:
+
+```xml
+<transcript>
+...auto-generated subtitle text...
+</transcript>
+```
+
+When no transcript is available (or when called from the Java video-service), it expands to an empty string.
 
 ### User Prompt Template
 
