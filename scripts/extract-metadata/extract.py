@@ -134,6 +134,9 @@ Extract location information where the encounter occurred.
 **Fields to extract:**
 - **name**: Location name such as a landmark (e.g., "Springfield City Hall") or street \
 address. See special instructions below.
+- **streetAddress**: The street address of the named location (e.g., "800 E Monroe St"). \
+If you know the physical street address from your training data, provide it. If you \
+are not confident, set to null. Do NOT fabricate addresses.
 - **city**: City name
 - **state**: State abbreviation (e.g., "CA", "TX")
 - **latitude** and **longitude**: Set these to null UNLESS they are explicitly stated in \
@@ -169,6 +172,7 @@ The JSON structure:
   "videoDate": "YYYY-MM-DD or null",
   "location": {
     "name": "location name or null",
+    "streetAddress": "street address or null",
     "city": "city name or null",
     "state": "XX or null",
     "latitude": 0.0 or null,
@@ -246,6 +250,9 @@ landmark > general landmark > first mentioned. Explain your selection by evaluat
 candidate against these criteria.
 - Extract the city (if any)
 - Extract the state (if any)
+- If the location is a well-known government building, courthouse, police station, or \
+other prominent landmark, provide the street address if you know it confidently. \
+If unsure, set streetAddress to null.
 - For latitude/longitude: Set to null unless you explicitly found coordinates in Step 1
 - If no location information was found, note that location should be null
 - Assess what your confidence score should be based on the specificity of location information
@@ -619,6 +626,7 @@ def build_output_entry(url: str, youtube_data: dict, claude_metadata: dict) -> d
         # Ensure all expected location fields exist
         location = {
             "name": location.get("name"),
+            "streetAddress": location.get("streetAddress"),
             "city": location.get("city"),
             "state": location.get("state"),
             "latitude": location.get("latitude"),

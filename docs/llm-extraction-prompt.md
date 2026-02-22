@@ -120,6 +120,9 @@ Extract location information where the encounter occurred.
 **Fields to extract:**
 - **name**: Location name such as a landmark (e.g., "Springfield City Hall") or street
   address. See special instructions below.
+- **streetAddress**: The street address of the named location (e.g., "800 E Monroe St").
+  If you know the physical street address from your training data, provide it. If you
+  are not confident, set to null. Do NOT fabricate addresses.
 - **city**: City name
 - **state**: State abbreviation (e.g., "CA", "TX")
 - **latitude** and **longitude**: Set these to null UNLESS they are explicitly stated in
@@ -154,6 +157,7 @@ The JSON structure:
   "videoDate": "YYYY-MM-DD or null",
   "location": {
     "name": "location name or null",
+    "streetAddress": "street address or null",
     "city": "city name or null",
     "state": "XX or null",
     "latitude": 0.0 or null,
@@ -247,6 +251,7 @@ The model's response contains XML thinking tags followed by the final JSON:
   "videoDate": null,
   "location": {
     "name": "City Hall",
+    "streetAddress": "800 E Monroe St",
     "city": "Springfield",
     "state": "IL",
     "latitude": null,
@@ -274,6 +279,7 @@ The service parses the last balanced `{...}` block from the response.
 | `videoDate` | `string \| null` | Yes | Date the incident occurred (ISO 8601 `YYYY-MM-DD`). `null` if not determinable. |
 | `location` | `object \| null` | Yes | Where the incident took place. `null` if not determinable. |
 | `location.name` | `string` | Yes* | Specific place name, prioritized: street address > specific landmark > general landmark. |
+| `location.streetAddress` | `string \| null` | Yes* | Street address of the named location (e.g., "800 E Monroe St"). `null` if unknown or not confident. |
 | `location.city` | `string \| null` | Yes* | City name. `null` if not determinable. |
 | `location.state` | `string \| null` | Yes* | US state abbreviation (e.g., "CA", "TX"). `null` if not determinable. |
 | `location.latitude` | `number \| null` | Yes* | Latitude. Always `null` unless explicitly stated in description text. |
@@ -334,3 +340,4 @@ Since the prompt instructs Claude to set latitude/longitude to `null` unless exp
 
 - **Web-app**: Calls the location-service geocode endpoint (`GET /locations/geocode?address=...`) using the extracted name/city/state
 - **Python CLI**: Uses the location-service geocode endpoint or a local geocoding library
+- **`streetAddress` improves geocoding precision**: When available, `streetAddress` should be preferred over `name` for geocoding queries. Street addresses like "800 E Monroe St, Springfield, IL" produce more accurate geocode results than landmark names like "City Hall, Springfield, IL".

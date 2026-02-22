@@ -100,13 +100,18 @@ for i in $(seq 0 $((TOTAL - 1))); do
     LAT=$(echo "$ENTRY" | jq '.location.latitude')
     LNG=$(echo "$ENTRY" | jq '.location.longitude')
     LOC_NAME=$(echo "$ENTRY" | jq -r '.location.name // empty')
+    LOC_STREET=$(echo "$ENTRY" | jq -r '.location.streetAddress // empty')
     LOC_CITY=$(echo "$ENTRY" | jq -r '.location.city // empty')
     LOC_STATE=$(echo "$ENTRY" | jq -r '.location.state // empty')
 
-    # If no lat/lng, try geocoding from name/city/state
+    # If no lat/lng, try geocoding from streetAddress/name/city/state
     if [[ "$LAT" == "null" || "$LNG" == "null" ]]; then
       ADDRESS_PARTS=""
-      [[ -n "$LOC_NAME" ]] && ADDRESS_PARTS="$LOC_NAME"
+      if [[ -n "$LOC_STREET" ]]; then
+        ADDRESS_PARTS="$LOC_STREET"
+      else
+        [[ -n "$LOC_NAME" ]] && ADDRESS_PARTS="$LOC_NAME"
+      fi
       [[ -n "$LOC_CITY" ]] && ADDRESS_PARTS="${ADDRESS_PARTS:+$ADDRESS_PARTS, }$LOC_CITY"
       [[ -n "$LOC_STATE" ]] && ADDRESS_PARTS="${ADDRESS_PARTS:+$ADDRESS_PARTS, }$LOC_STATE"
 
@@ -119,8 +124,8 @@ for i in $(seq 0 $((TOTAL - 1))); do
         GEO_BODY=$(echo "$GEOCODE_RESPONSE" | sed '$d')
 
         if [[ "$GEO_CODE" == "200" ]]; then
-          LAT=$(echo "$GEO_BODY" | jq '.latitude')
-          LNG=$(echo "$GEO_BODY" | jq '.longitude')
+          LAT=$(echo "$GEO_BODY" | jq '.coordinates.latitude')
+          LNG=$(echo "$GEO_BODY" | jq '.coordinates.longitude')
         fi
       fi
     fi

@@ -110,6 +110,7 @@ Each entry in the output JSON array follows this schema:
   "videoDate": "2024-03-15",
   "location": {
     "name": "City Hall",
+    "streetAddress": "200 N Spring St",
     "city": "Los Angeles",
     "state": "CA",
     "latitude": null,
@@ -142,7 +143,7 @@ Each entry in the output JSON array follows this schema:
 | `amendments` | Constitutional amendments relevant to the video (e.g., `FIRST`, `FOURTH`) |
 | `participants` | Types of participants (e.g., `POLICE`, `CITIZEN`, `GOVERNMENT`) |
 | `videoDate` | Date of the incident (ISO 8601), or `null` if not determinable |
-| `location` | Location object with name, city, state, latitude, longitude; or `null` |
+| `location` | Location object with name, streetAddress, city, state, latitude, longitude; or `null` |
 | `confidence` | Confidence scores (0.0-1.0) for each extracted field |
 
 See [docs/llm-extraction-prompt.md](../../docs/llm-extraction-prompt.md) for the full extraction prompt specification, valid enum values, and extraction rules.
