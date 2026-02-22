@@ -111,7 +111,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
       [[ -n "$LOC_STATE" ]] && ADDRESS_PARTS="${ADDRESS_PARTS:+$ADDRESS_PARTS, }$LOC_STATE"
 
       if [[ -n "$ADDRESS_PARTS" ]]; then
-        ENCODED_ADDRESS=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$ADDRESS_PARTS'))" 2>/dev/null || echo "$ADDRESS_PARTS")
+        ENCODED_ADDRESS=$(echo "$ADDRESS_PARTS" | python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))" 2>/dev/null || echo "$ADDRESS_PARTS")
         GEOCODE_RESPONSE=$(curl -s -w "\n%{http_code}" \
           "$API_URL/locations/geocode?address=$ENCODED_ADDRESS" \
           -H "$AUTH_HEADER")
