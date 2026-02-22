@@ -62,34 +62,29 @@ def normalize_channel_url(channel: str) -> str:
     return f"https://www.youtube.com/@{channel}/videos"
 
 
-def _build_ydl_opts(
-    max_results: int | None,
-    after_date: str | None,
-    before_date: str | None,
-) -> dict:
+def _build_ydl_opts(max_results: int | None) -> dict:
     """Build yt-dlp options for channel video extraction."""
     opts: dict = {
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
-        "extract_flat": False,
+        "extract_flat": True,
         "ignoreerrors": True,
     }
 
-    if after_date or before_date:
-        opts["daterange"] = yt_dlp.utils.DateRange(
-            start=after_date or "19700101",
-            end=before_date or "99991231",
-        )
-
-    # Over-fetch to account for Shorts that will be filtered out
+    # Over-fetch to account for Shorts/date filtering that will remove entries
     if max_results is not None:
         opts["playlistend"] = max_results * 3
 
     return opts
 
 
-def _parse_entry(entry: dict | None, min_duration: int) -> dict | None:
+def _parse_entry(
+    entry: dict | None,
+    min_duration: int,
+    after_date: str | None,
+    before_date: str | None,
+) -> dict | None:
     """Parse a single yt-dlp entry into a video dict, or None if filtered out."""
     if entry is None:
         return None
@@ -97,6 +92,14 @@ def _parse_entry(entry: dict | None, min_duration: int) -> dict | None:
     duration = entry.get("duration") or 0
     if duration < min_duration:
         return None
+
+    # Date filtering — upload_date is YYYYMMDD from yt-dlp
+    upload_date = entry.get("upload_date", "")
+    if upload_date and (after_date or before_date):
+        if after_date and upload_date < after_date:
+            return None
+        if before_date and upload_date > before_date:
+            return None
 
     video_url = entry.get("webpage_url") or entry.get("url", "")
     if not video_url:
@@ -111,7 +114,7 @@ def _parse_entry(entry: dict | None, min_duration: int) -> dict | None:
         "url": video_url,
         "title": entry.get("title", ""),
         "duration": duration,
-        "upload_date": entry.get("upload_date", ""),
+        "upload_date": upload_date,
     }
 
 
@@ -127,14 +130,14 @@ def fetch_channel_videos(
     Args:
         channel_url: Normalized YouTube channel URL (ending in /videos).
         max_results: Maximum number of videos to return after filtering.
-        after_date: Only include videos published on/after this date (YYYY-MM-DD).
-        before_date: Only include videos published on/before this date (YYYY-MM-DD).
+        after_date: Only include videos published on/after this date (YYYYMMDD).
+        before_date: Only include videos published on/before this date (YYYYMMDD).
         min_duration: Minimum duration in seconds (default 61, filters Shorts).
 
     Returns:
         List of dicts with keys: url, title, duration, upload_date.
     """
-    ydl_opts = _build_ydl_opts(max_results, after_date, before_date)
+    ydl_opts = _build_ydl_opts(max_results)
 
     print(f"Fetching videos from: {channel_url}", file=sys.stderr)
 
@@ -147,7 +150,7 @@ def fetch_channel_videos(
 
     videos = []
     for entry in info.get("entries") or []:
-        video = _parse_entry(entry, min_duration)
+        video = _parse_entry(entry, min_duration, after_date, before_date)
         if video is not None:
             videos.append(video)
             if max_results is not None and len(videos) >= max_results:
@@ -222,21 +225,27 @@ def main():
 
     args = parser.parse_args()
 
-    # Validate date formats
+    # Validate date formats and convert to YYYYMMDD for yt-dlp comparison
+    after_yyyymmdd = None
+    before_yyyymmdd = None
     for date_arg, name in [(args.after, "--after"), (args.before, "--before")]:
         if date_arg is not None:
             try:
                 datetime.strptime(date_arg, "%Y-%m-%d")
             except ValueError:
                 parser.error(f"{name} must be in YYYY-MM-DD format, got: {date_arg}")
+    if args.after:
+        after_yyyymmdd = args.after.replace("-", "")
+    if args.before:
+        before_yyyymmdd = args.before.replace("-", "")
 
     channel_url = normalize_channel_url(args.channel)
 
     videos = fetch_channel_videos(
         channel_url=channel_url,
         max_results=args.max_results,
-        after_date=args.after,
-        before_date=args.before,
+        after_date=after_yyyymmdd,
+        before_date=before_yyyymmdd,
         min_duration=args.min_duration,
     )
 

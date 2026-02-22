@@ -360,6 +360,8 @@ def fetch_youtube_metadata(url: str, include_transcript: bool = True) -> dict:
         "no_warnings": True,
         "skip_download": True,
         "format": "best",
+        "sleep_requests": 0.75,
+        "sleep_interval": 2,
     }
 
     if include_transcript:
@@ -369,6 +371,7 @@ def fetch_youtube_metadata(url: str, include_transcript: bool = True) -> dict:
                 "writesubtitles": True,
                 "subtitleslangs": ["en"],
                 "subtitlesformat": "json3",
+                "sleep_subtitles": 5,
             }
         )
 
@@ -413,14 +416,27 @@ def _extract_transcript(info: dict) -> str | None:
     # If yt-dlp provided a URL but no inline data, we need to fetch it
     sub_url = en_sub.get("url")
     if sub_url:
-        try:
-            import urllib.request
+        import urllib.request
 
-            with urllib.request.urlopen(sub_url, timeout=15) as resp:
-                raw = resp.read().decode("utf-8", errors="replace")
-            return _parse_subtitle_data(raw, en_sub.get("ext", ""))
-        except Exception:
-            return None
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(sub_url, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                return _parse_subtitle_data(raw, en_sub.get("ext", ""))
+            except urllib.error.HTTPError as e:
+                if e.code == 429 and attempt < 2:
+                    wait = 5 * (attempt + 1)
+                    print(
+                        f"  Subtitle fetch rate-limited, retrying in {wait}s...",
+                        file=sys.stderr,
+                    )
+                    time.sleep(wait)
+                else:
+                    print(f"  Subtitle fetch failed: {e}", file=sys.stderr)
+                    return None
+            except Exception as e:
+                print(f"  Subtitle fetch failed: {e}", file=sys.stderr)
+                return None
 
     return None
 
@@ -735,7 +751,12 @@ def process_urls_batch(
     print(f"\nSubmitting batch of {len(youtube_data)} requests...", file=sys.stderr)
 
     requests = []
+    # custom_id must be [a-zA-Z0-9_-]{1,64} — use video ID, map back to URL
+    id_to_url = {}
     for url, yt_data in youtube_data.items():
+        video_id = url.split("watch?v=")[-1].split("&")[0] if "watch?v=" in url else url
+        id_to_url[video_id] = url
+
         user_message = build_batch_user_message(
             title=yt_data["title"],
             description=yt_data["description"],
@@ -747,7 +768,7 @@ def process_urls_batch(
 
         requests.append(
             {
-                "custom_id": url,
+                "custom_id": video_id,
                 "params": {
                     "model": model,
                     "max_tokens": 4096,
@@ -794,7 +815,8 @@ def process_urls_batch(
     errors = []
 
     for entry in client.messages.batches.results(batch.id):
-        url = entry.custom_id
+        video_id = entry.custom_id
+        url = id_to_url.get(video_id, video_id)
         if entry.result.type == "succeeded":
             try:
                 raw_text = entry.result.message.content[0].text.strip()
