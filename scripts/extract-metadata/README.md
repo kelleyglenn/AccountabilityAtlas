@@ -133,10 +133,11 @@ See [docs/llm-extraction-prompt.md](../../docs/llm-extraction-prompt.md) for the
 
 ## How It Works
 
-1. **Fetch metadata**: Uses the `yt-dlp` Python library to extract video title, description, channel, thumbnail, and duration without downloading the video.
+1. **Fetch metadata**: Uses the `yt-dlp` Python library to extract video title, description, publication date, channel, thumbnail, and duration without downloading the video.
 2. **Fetch transcript**: Optionally retrieves auto-generated English subtitles and parses them into plain text.
-3. **Call Claude**: Sends the title, description, and transcript (if available) to Claude using the shared extraction prompt from `docs/llm-extraction-prompt.md`.
-4. **Combine results**: Merges YouTube metadata with Claude's extracted fields into the seed-data format.
+3. **Call Claude**: Sends a user-only prompt (no system prompt) with XML-tagged video data, following the shared extraction prompt spec from [`docs/llm-extraction-prompt.md`](../../docs/llm-extraction-prompt.md). The prompt is identical to the Java video-service's `/videos/extract` endpoint, with the addition of an optional `<transcript>` section. Claude responds with XML thinking tags (multi-step analysis) followed by the final JSON object.
+4. **Parse response**: Extracts the last balanced JSON object from the response (skipping the XML thinking tags), matching the Java service's parsing logic.
+5. **Combine results**: Merges YouTube metadata with Claude's extracted fields into the seed-data format.
 
 If a transcript is unavailable, the tool falls back to extracting from title and description only, which typically produces lower confidence scores.
 

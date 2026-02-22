@@ -39,16 +39,229 @@ except ImportError:
     sys.exit(1)
 
 
-SYSTEM_PROMPT = (
-    "You are a metadata extraction assistant for AccountabilityAtlas, a platform that catalogs\n"
-    "videos of encounters between citizens and government/law enforcement in the United States,\n"
-    "focusing on constitutional rights (especially First Amendment audits).\n"
-    "\n"
-    "Given a YouTube video's title, description, and optionally its transcript, extract structured\n"
-    "metadata about the video. Respond ONLY with a JSON object — no markdown fences, no explanation."
-)
-
 DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+
+# This prompt mirrors the Java video-service MetadataExtractionService prompt.
+# Both must stay in sync — see docs/llm-extraction-prompt.md for the shared spec.
+# The only addition here is the optional <transcript> section.
+USER_PROMPT_TEMPLATE = """\
+You are a metadata extraction assistant for AccountabilityAtlas, a platform that catalogs \
+videos documenting encounters between citizens and government/law enforcement in the \
+United States, with a focus on constitutional rights (especially First Amendment audits).
+
+Here is the YouTube video information you need to analyze:
+
+<video_description>
+{{description}}
+</video_description>
+
+<video_title>
+{{title}}
+</video_title>
+
+<publication_date>
+{{published}}
+</publication_date>
+{{transcript_section}}
+## Your Task
+
+Extract structured metadata from this video and output it as a JSON object. You will identify:
+
+1. **Constitutional amendments** involved in the encounter
+2. **Types of participants** in the encounter (excluding the video publisher themselves)
+3. **Date** when the encounter occurred (not the publication date)
+4. **Location** where the encounter occurred
+5. **Confidence scores** for each category of extracted information
+
+## Classification Categories
+
+### Amendments
+
+Identify which constitutional amendments are relevant to this encounter. You may select \
+multiple amendments.
+
+**Valid values:**
+- **FIRST**: The encounter involves freedom of press, religion, assembly, speech, or the \
+right to petition the government and/or protest
+- **SECOND**: The encounter involves the right to bear firearms or other weapons
+- **FOURTH**: The encounter involves the right to be free from searches or seizures, \
+including issues about providing identification or requiring search warrants
+- **FIFTH**: The encounter involves the right to remain silent and not incriminate oneself
+- **FOURTEENTH**: The encounter involves citizenship rights for those born/naturalized in \
+the U.S., or guarantees of due process and equal protection under the law
+
+**CRITICAL CONSTRAINT for FOURTH, FIFTH, and FOURTEENTH:**
+You may ONLY select these amendments if:
+- POLICE or GOVERNMENT are among the participants, OR
+- These specific amendments are explicitly mentioned by name in the video title or description
+
+If you cannot identify any valid amendments after applying this constraint, default to FIRST \
+and assign an appropriately low confidence score.
+
+### Participants
+
+Identify all types of participants involved in the encounter. You may select multiple \
+participant types. Do NOT categorize the video publisher themselves.
+
+**Valid values:**
+- **POLICE**: Law enforcement at any level (local, city, county, state, or federal)
+- **GOVERNMENT**: Government workers who are not law enforcement (e.g., mayor, city/county \
+clerk, district attorneys, public works employees)
+- **BUSINESS**: Owners or employees of private (non-government) businesses
+- **SECURITY**: Private security personnel (not law enforcement)
+- **CITIZEN**: Use this when an encounter participant is mentioned but their category cannot \
+otherwise be determined
+
+### Video Date
+
+Extract the date when the encounter occurred (not the publication date).
+
+- Use format: YYYY-MM-DD
+- Set to null if you cannot determine the date from the title or description
+- If the title and description don't specify an exact date AND don't provide a relative date \
+(like "yesterday", "last Tuesday", or "five days ago"), set to null and assign a low \
+confidence score
+
+### Location
+
+Extract location information where the encounter occurred.
+
+**Fields to extract:**
+- **name**: Location name such as a landmark (e.g., "Springfield City Hall") or street \
+address. See special instructions below.
+- **city**: City name
+- **state**: State abbreviation (e.g., "CA", "TX")
+- **latitude** and **longitude**: Set these to null UNLESS they are explicitly stated in \
+the video description. Do not calculate, assume, or look up coordinates.
+
+**Special instruction for location name:**
+If you find multiple potential location names in the evidence, select ONE using this \
+priority order:
+1. Street address (most specific)
+2. Specific landmark (e.g., "City Hall", "County Courthouse")
+3. General landmark (e.g., "Police Department", "Post Office")
+4. If no other distinguishing factors exist, choose the first one mentioned
+
+Set the entire location object to null if you cannot determine any location information.
+
+### Confidence Scores
+
+For each major field (amendments, participants, videoDate, location), provide a confidence \
+score between 0.0 (no confidence) and 1.0 (complete confidence) indicating how certain you \
+are about your extraction.
+
+## Required Output Format
+
+You must output ONLY a JSON object. Do NOT include markdown code fences (like ```json). Do \
+NOT include any explanatory text before or after the JSON.
+
+The JSON structure:
+
+```json
+{
+  "amendments": ["AMENDMENT_NAME_1", "AMENDMENT_NAME_2"],
+  "participants": ["PARTICIPANT_TYPE_1", "PARTICIPANT_TYPE_2"],
+  "videoDate": "YYYY-MM-DD or null",
+  "location": {
+    "name": "location name or null",
+    "city": "city name or null",
+    "state": "XX or null",
+    "latitude": 0.0 or null,
+    "longitude": 0.0 or null
+  },
+  "confidence": {
+    "amendments": 0.0,
+    "participants": 0.0,
+    "videoDate": 0.0,
+    "location": 0.0
+  }
+}
+```
+
+## Processing Steps
+
+Before constructing your final JSON output, work through the following analytical steps:
+
+**Step 1: Extract Evidence**
+
+Wrap your work in <evidence_extraction> tags. Extract and quote relevant information from \
+the video title and description. It's OK for this section to be quite long.
+
+- Quote specific phrases that suggest constitutional concepts (e.g., "filming in public", \
+"refused to ID", "open carry", "detained")
+- Quote specific phrases that identify participant types (e.g., "officer", "deputy", \
+"city clerk", "security guard", "store manager")
+- Quote any dates mentioned (both absolute dates like "January 15, 2024" and relative dates \
+like "yesterday" or "last week")
+- Quote any location information (city names, state names, building names, street addresses)
+- Explicitly check: Are latitude and longitude coordinates stated in the description? If \
+yes, quote them exactly.
+
+**Step 2: Analyze Amendments**
+
+Wrap your work in <amendment_analysis> tags. Map the constitutional concepts to amendments:
+
+- For each constitutional concept you identified, determine which amendment(s) it relates to
+- List all potentially relevant amendments with your reasoning
+- Note which participant types you've identified so far
+
+**Step 3: Validate Amendments**
+
+Wrap your work in <amendment_validation> tags. Validate your amendment selections against \
+the critical constraint:
+
+- For each amendment you're considering (FIRST, SECOND, FOURTH, FIFTH, FOURTEENTH), \
+explicitly write "VALID" or "INVALID" next to it
+- For FOURTH, FIFTH, and FOURTEENTH specifically: Check if POLICE or GOVERNMENT are \
+participants, OR if these amendments are explicitly mentioned by name in the \
+title/description. Write out your reasoning for marking each as VALID or INVALID.
+- For FIRST and SECOND: These don't have the critical constraint, so explain why they are \
+VALID or INVALID based on the content alone
+- If all amendments are marked INVALID, note that you will default to FIRST with low \
+confidence
+
+**Step 4: Process Date**
+
+Wrap your work in <date_processing> tags to determine the video date:
+
+- Is there an absolute date in the title/description? If yes, convert it to YYYY-MM-DD format
+- Is there a relative date (e.g., "yesterday", "last Tuesday")? If yes, calculate the \
+actual date using the publication date as reference
+- If neither, note that videoDate should be null
+- Assess what your confidence score should be based on the specificity of date information
+
+**Step 5: Process Location**
+
+Wrap your work in <location_processing> tags to structure the location information:
+
+- List out ALL potential location names found in the evidence (landmarks, street addresses, \
+building names)
+- If multiple location names exist, apply the selection priority: street address > specific \
+landmark > general landmark > first mentioned. Explain your selection by evaluating each \
+candidate against these criteria.
+- Extract the city (if any)
+- Extract the state (if any)
+- For latitude/longitude: Set to null unless you explicitly found coordinates in Step 1
+- If no location information was found, note that location should be null
+- Assess what your confidence score should be based on the specificity of location information
+
+**Step 6: Construct JSON**
+
+Wrap your work in <json_construction> tags to build your JSON object step by step:
+
+- Finalize the amendments array (only VALID amendments from Step 3)
+- Finalize the participants array
+- Set the videoDate value
+- Structure the location object with the selected location name
+- Assign confidence scores for each field. For each of the four confidence scores \
+(amendments, participants, videoDate, location), write out explicit justification for \
+the specific numeric value you're assigning (e.g., "amendments: 0.85 because X, Y, \
+and Z").
+
+**Step 7: Output Final JSON**
+
+After completing all analytical steps, output only the final JSON object with no additional \
+text, no markdown formatting, and no code fences."""
 
 
 def fetch_youtube_metadata(url: str, include_transcript: bool = True) -> dict:
@@ -60,7 +273,7 @@ def fetch_youtube_metadata(url: str, include_transcript: bool = True) -> dict:
 
     Returns:
         Dictionary with keys: url, title, description, channel, thumbnail,
-        duration, transcript (str or None).
+        duration, published (str or None), transcript (str or None).
     """
     ydl_opts = {
         "quiet": True,
@@ -95,6 +308,7 @@ def fetch_youtube_metadata(url: str, include_transcript: bool = True) -> dict:
         "channel": info.get("channel") or info.get("uploader", ""),
         "thumbnail": thumbnail,
         "duration": info.get("duration"),
+        "published": info.get("upload_date"),
         "transcript": transcript,
     }
 
@@ -212,12 +426,63 @@ def _pick_best_thumbnail(info: dict) -> str | None:
     return thumbnail
 
 
-def build_user_message(title: str, description: str, transcript: str | None) -> str:
-    """Build the user message for Claude following the shared prompt spec."""
-    msg = f"Extract metadata from this YouTube video:\n\nTitle: {title}\n\nDescription:\n{description}"
+def build_user_message(title: str, description: str, published: str | None, transcript: str | None) -> str:
+    """Build the user message for Claude following the shared prompt spec.
+
+    Uses USER_PROMPT_TEMPLATE with the same structure as the Java video-service.
+    When a transcript is available, it is inserted as an additional XML-tagged section.
+    """
+    transcript_section = ""
     if transcript:
-        msg += f"\n\nTranscript:\n{transcript}"
-    return msg
+        transcript_section = (
+            "\n<transcript>\n"
+            f"{transcript}\n"
+            "</transcript>\n"
+        )
+
+    return (
+        USER_PROMPT_TEMPLATE
+        .replace("{{title}}", title or "")
+        .replace("{{description}}", description or "")
+        .replace("{{published}}", published or "unknown")
+        .replace("{{transcript_section}}", transcript_section)
+    )
+
+
+def _extract_json(text: str) -> str:
+    """Extract the last top-level JSON object from the response text.
+
+    The response may contain XML thinking tags (evidence_extraction,
+    amendment_analysis, etc.) followed by the final JSON object.
+    This finds the last balanced {...} block in the response, matching
+    the Java service's extractJson logic.
+    """
+    trimmed = text.strip()
+
+    # Handle code fences if present
+    if trimmed.startswith("```"):
+        first_newline = trimmed.index("\n") if "\n" in trimmed else -1
+        if first_newline >= 0:
+            last_fence = trimmed.rfind("```")
+            if last_fence > first_newline:
+                trimmed = trimmed[first_newline + 1 : last_fence].strip()
+
+    # Find the last '}' and walk back to find its matching '{'
+    last_brace = trimmed.rfind("}")
+    if last_brace < 0:
+        return trimmed
+
+    depth = 0
+    for i in range(last_brace, -1, -1):
+        c = trimmed[i]
+        if c == "}":
+            depth += 1
+        elif c == "{":
+            depth -= 1
+            if depth == 0:
+                return trimmed[i : last_brace + 1]
+
+    return trimmed
 
 
 def extract_metadata_with_claude(
@@ -226,6 +491,9 @@ def extract_metadata_with_claude(
     model: str = DEFAULT_MODEL,
 ) -> dict:
     """Call Claude to extract structured metadata from video information.
+
+    Uses the same user-only prompt as the Java video-service, with an
+    additional transcript section when available. See docs/llm-extraction-prompt.md.
 
     Args:
         client: Anthropic client instance.
@@ -238,6 +506,7 @@ def extract_metadata_with_claude(
     user_message = build_user_message(
         title=youtube_data["title"],
         description=youtube_data["description"],
+        published=youtube_data.get("published"),
         transcript=youtube_data.get("transcript"),
     )
 
@@ -249,22 +518,15 @@ def extract_metadata_with_claude(
 
     response = client.messages.create(
         model=model,
-        max_tokens=1024,
-        system=SYSTEM_PROMPT,
+        max_tokens=4096,
         messages=[{"role": "user", "content": user_message}],
     )
 
     raw_text = response.content[0].text.strip()
-
-    # Strip markdown fences if Claude included them despite instructions
-    if raw_text.startswith("```"):
-        lines = raw_text.split("\n")
-        # Remove first line (```json) and last line (```)
-        lines = [ln for ln in lines if not ln.strip().startswith("```")]
-        raw_text = "\n".join(lines).strip()
+    json_str = _extract_json(raw_text)
 
     try:
-        return json.loads(raw_text)
+        return json.loads(json_str)
     except json.JSONDecodeError as e:
         print(f"Warning: Failed to parse Claude's response as JSON: {e}", file=sys.stderr)
         print(f"Raw response:\n{raw_text}", file=sys.stderr)

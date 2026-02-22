@@ -19,6 +19,7 @@ The extraction uses a **user-only prompt** (no system prompt). The prompt includ
 | `{{title}}` | YouTube API `snippet.title` | Video title |
 | `{{description}}` | YouTube API `snippet.description` | Video description |
 | `{{published}}` | YouTube API `snippet.publishedAt` | Publication date (used as reference for relative date calculations) |
+| `{{transcript_section}}` | yt-dlp auto-subtitles (Python CLI only) | Optional `<transcript>...</transcript>` XML block inserted after `<publication_date>`. The Java video-service does not have access to transcripts, so this variable is empty. |
 
 ### User Prompt Template
 
@@ -40,7 +41,7 @@ Here is the YouTube video information you need to analyze:
 <publication_date>
 {{published}}
 </publication_date>
-
+{{transcript_section}}
 ## Your Task
 
 Extract structured metadata from this video and output it as a JSON object. You will identify:
