@@ -62,6 +62,59 @@ def normalize_channel_url(channel: str) -> str:
     return f"https://www.youtube.com/@{channel}/videos"
 
 
+def _build_ydl_opts(
+    max_results: int | None,
+    after_date: str | None,
+    before_date: str | None,
+) -> dict:
+    """Build yt-dlp options for channel video extraction."""
+    opts: dict = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "extract_flat": False,
+        "ignoreerrors": True,
+    }
+
+    if after_date or before_date:
+        opts["daterange"] = yt_dlp.utils.DateRange(
+            start=after_date or "19700101",
+            end=before_date or "99991231",
+        )
+
+    # Over-fetch to account for Shorts that will be filtered out
+    if max_results is not None:
+        opts["playlistend"] = max_results * 3
+
+    return opts
+
+
+def _parse_entry(entry: dict | None, min_duration: int) -> dict | None:
+    """Parse a single yt-dlp entry into a video dict, or None if filtered out."""
+    if entry is None:
+        return None
+
+    duration = entry.get("duration") or 0
+    if duration < min_duration:
+        return None
+
+    video_url = entry.get("webpage_url") or entry.get("url", "")
+    if not video_url:
+        return None
+
+    # Ensure it's a proper watch URL, not a channel/playlist URL
+    video_id = entry.get("id", "")
+    if video_id and "watch?v=" not in video_url:
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    return {
+        "url": video_url,
+        "title": entry.get("title", ""),
+        "duration": duration,
+        "upload_date": entry.get("upload_date", ""),
+    }
+
+
 def fetch_channel_videos(
     channel_url: str,
     max_results: int | None = None,
@@ -81,24 +134,7 @@ def fetch_channel_videos(
     Returns:
         List of dicts with keys: url, title, duration, upload_date.
     """
-    ydl_opts: dict = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-        "extract_flat": False,
-        "ignoreerrors": True,
-    }
-
-    # Use yt-dlp daterange for server-side date filtering
-    if after_date or before_date:
-        ydl_opts["daterange"] = yt_dlp.utils.DateRange(
-            start=after_date or "19700101",
-            end=before_date or "99991231",
-        )
-
-    # Over-fetch to account for Shorts that will be filtered out
-    if max_results is not None:
-        ydl_opts["playlistend"] = max_results * 3
+    ydl_opts = _build_ydl_opts(max_results, after_date, before_date)
 
     print(f"Fetching videos from: {channel_url}", file=sys.stderr)
 
@@ -109,39 +145,13 @@ def fetch_channel_videos(
         print("Error: Could not extract channel information.", file=sys.stderr)
         return []
 
-    entries = info.get("entries") or []
-
     videos = []
-    for entry in entries:
-        if entry is None:
-            continue
-
-        duration = entry.get("duration") or 0
-        if duration < min_duration:
-            continue
-
-        upload_date = entry.get("upload_date", "")
-        video_url = entry.get("webpage_url") or entry.get("url", "")
-
-        if not video_url:
-            continue
-
-        # Ensure it's a proper watch URL, not a channel/playlist URL
-        video_id = entry.get("id", "")
-        if video_id and "watch?v=" not in video_url:
-            video_url = f"https://www.youtube.com/watch?v={video_id}"
-
-        videos.append(
-            {
-                "url": video_url,
-                "title": entry.get("title", ""),
-                "duration": duration,
-                "upload_date": upload_date,
-            }
-        )
-
-        if max_results is not None and len(videos) >= max_results:
-            break
+    for entry in info.get("entries") or []:
+        video = _parse_entry(entry, min_duration)
+        if video is not None:
+            videos.append(video)
+            if max_results is not None and len(videos) >= max_results:
+                break
 
     return videos
 
