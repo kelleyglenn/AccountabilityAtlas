@@ -14,9 +14,12 @@ AccountabilityAtlas/
 │   ├── docker-start.sh                # Start all services (docker mode)
 │   ├── docker-stop.sh                 # Stop docker services
 │   ├── deploy.sh                      # Build, check, and redeploy individual services
+│   ├── seed-videos.sh                 # Seed videos from JSON into the running stack
 │   ├── aws/                           # AWS start, stop, and deploy scripts
+│   ├── extract-metadata/              # Python CLI for AI-powered video metadata extraction
 │   ├── lib/                           # Shared script utilities
 │   └── integration/                   # Cross-service integration tests
+├── seed-data/                         # Generated seed data (JSON, not committed)
 ├── docker-compose.yml                 # Local multi-service development
 ├── AcctAtlas-api-gateway/             # API Gateway service
 ├── AcctAtlas-user-service/            # User management and authentication
@@ -92,6 +95,16 @@ Infrastructure is provisioned with OpenTofu and deployed via SSH to a single EC2
 ```
 
 See [docs/07-InfrastructureArchitecture.md](docs/07-InfrastructureArchitecture.md) for the full infrastructure architecture across deployment phases.
+
+## AI Metadata Extraction
+
+The project includes tools for AI-powered extraction of video metadata (amendments, participants, location, date) using Claude:
+
+- **`scripts/extract-metadata/`** — Python CLI that uses yt-dlp and the Anthropic SDK to extract metadata from YouTube videos, including optional transcript analysis. See [scripts/extract-metadata/README.md](scripts/extract-metadata/README.md).
+- **`scripts/seed-videos.sh`** — Seeds videos from a JSON file into the running stack via the API. Reads output from the extract CLI.
+- **`/api/v1/videos/extract`** — Video-service REST endpoint for real-time extraction (title + description only, no transcript).
+
+The shared prompt and output schema are documented in [docs/llm-extraction-prompt.md](docs/llm-extraction-prompt.md).
 
 ## Key Gradle Tasks
 

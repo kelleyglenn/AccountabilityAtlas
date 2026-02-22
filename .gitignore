@@ -24,6 +24,7 @@ target/
 out/
 .gradle/
 node_modules/
+__pycache__/
 
 # Environment files
 .env
@@ -45,6 +46,9 @@ infra/*.tfstate
 infra/*.tfstate.backup
 infra/*.tfvars
 !infra/example.tfvars
+
+# Seed data (generated, keep local)
+seed-data/*.json
 
 # AWS deployment config
 scripts/aws/config.env
