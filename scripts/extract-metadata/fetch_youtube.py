@@ -318,7 +318,7 @@ def _fetch_all(
             if _is_rate_limited(e):
                 remaining = len(urls) - i
                 print(
-                    f"\n  Rate limited by YouTube (HTTP 429). Stopping.",
+                    "\n  Rate limited by YouTube (HTTP 429). Stopping.",
                     file=sys.stderr,
                 )
                 print(
@@ -326,7 +326,7 @@ def _fetch_all(
                     file=sys.stderr,
                 )
                 print(
-                    f"  Wait for the rate limit to clear, then re-run with --append.",
+                    "  Wait for the rate limit to clear, then re-run with --append.",
                     file=sys.stderr,
                 )
                 errors.append(f"Rate limited at video {i}/{len(urls)}: {url}")
