@@ -650,6 +650,64 @@ def _load_existing_output(output_path: Path) -> tuple[list, set]:
     return entries, urls
 
 
+def _filter_existing_urls(data_list: list[dict], existing_urls: set) -> list[dict]:
+    """Remove already-processed entries and report skipped count."""
+    if not existing_urls:
+        return data_list
+
+    filtered = [d for d in data_list if d.get("url") not in existing_urls]
+    skipped = len(data_list) - len(filtered)
+    if skipped:
+        print(f"Skipping {skipped} already-extracted URL(s).", file=sys.stderr)
+    return filtered
+
+
+def _process_sequential(
+    youtube_data_list: list[dict],
+    client: anthropic.Anthropic,
+    model: str,
+    results: list[dict],
+    errors: list[str],
+) -> None:
+    """Process videos one at a time through Claude extraction."""
+    for i, yt_data in enumerate(youtube_data_list, 1):
+        url = yt_data.get("url", "unknown")
+        print(f"\n[{i}/{len(youtube_data_list)}] Processing: {url}", file=sys.stderr)
+        try:
+            entry = process_single(yt_data, client, model)
+            results.append(entry)
+        except Exception as e:
+            error_msg = f"Failed to process {url}: {e}"
+            print(f"  Error: {error_msg}", file=sys.stderr)
+            errors.append(error_msg)
+
+
+def _write_output(output_arg: str | None, results: list[dict]) -> None:
+    """Write results to file or stdout."""
+    output_json = json.dumps(results, indent=2, ensure_ascii=False)
+
+    if output_arg:
+        output_path = Path(output_arg)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(output_json)
+            f.write("\n")
+        print(f"\nWrote {len(results)} entries to {output_arg}.", file=sys.stderr)
+    else:
+        print(output_json)
+
+
+def _print_summary(new_count: int, errors: list[str]) -> None:
+    """Print summary and exit with appropriate code."""
+    if errors:
+        print(f"\nCompleted with {len(errors)} error(s):", file=sys.stderr)
+        for err in errors:
+            print(f"  - {err}", file=sys.stderr)
+        sys.exit(1 if new_count == 0 else 0)
+    else:
+        print(f"\nSuccessfully processed {new_count} entry(ies).", file=sys.stderr)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Extract structured metadata from YouTube data using Claude for AccountabilityAtlas.",
@@ -690,7 +748,6 @@ def main():
 
     args = parser.parse_args()
 
-    # Validate arguments
     if args.append and not args.output:
         parser.error("--append requires --output.")
 
@@ -701,7 +758,6 @@ def main():
         sys.exit(1)
 
     youtube_data_list = _load_json_array(input_path, "Input file")
-
     if not youtube_data_list:
         print("Error: Input file contains no entries.", file=sys.stderr)
         sys.exit(1)
@@ -720,19 +776,9 @@ def main():
 
     # Load existing entries if appending
     existing_entries = []
-    existing_urls = set()
     if args.append and args.output:
         existing_entries, existing_urls = _load_existing_output(Path(args.output))
-
-    # Filter out already-processed entries when appending
-    if existing_urls:
-        original_count = len(youtube_data_list)
-        youtube_data_list = [
-            d for d in youtube_data_list if d.get("url") not in existing_urls
-        ]
-        skipped = original_count - len(youtube_data_list)
-        if skipped:
-            print(f"Skipping {skipped} already-extracted URL(s).", file=sys.stderr)
+        youtube_data_list = _filter_existing_urls(youtube_data_list, existing_urls)
 
     if not youtube_data_list and existing_entries:
         print("All entries already extracted. Nothing to do.", file=sys.stderr)
@@ -743,45 +789,14 @@ def main():
     errors = []
 
     if args.batch:
-        batch_results, batch_errors = process_batch(
-            youtube_data_list, client, args.model
-        )
+        batch_results, batch_errors = process_batch(youtube_data_list, client, args.model)
         results.extend(batch_results)
         errors.extend(batch_errors)
     else:
-        for i, yt_data in enumerate(youtube_data_list, 1):
-            url = yt_data.get("url", "unknown")
-            print(f"\n[{i}/{len(youtube_data_list)}] Processing: {url}", file=sys.stderr)
-            try:
-                entry = process_single(yt_data, client, args.model)
-                results.append(entry)
-            except Exception as e:
-                error_msg = f"Failed to process {url}: {e}"
-                print(f"  Error: {error_msg}", file=sys.stderr)
-                errors.append(error_msg)
+        _process_sequential(youtube_data_list, client, args.model, results, errors)
 
-    # Output results
-    output_json = json.dumps(results, indent=2, ensure_ascii=False)
-
-    if args.output:
-        output_path = Path(args.output)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(output_json)
-            f.write("\n")
-        print(f"\nWrote {len(results)} entries to {args.output}.", file=sys.stderr)
-    else:
-        print(output_json)
-
-    # Summary
-    new_count = len(results) - len(existing_entries)
-    if errors:
-        print(f"\nCompleted with {len(errors)} error(s):", file=sys.stderr)
-        for err in errors:
-            print(f"  - {err}", file=sys.stderr)
-        sys.exit(1 if new_count == 0 else 0)
-    else:
-        print(f"\nSuccessfully processed {new_count} entry(ies).", file=sys.stderr)
+    _write_output(args.output, results)
+    _print_summary(len(results) - len(existing_entries), errors)
 
 
 if __name__ == "__main__":

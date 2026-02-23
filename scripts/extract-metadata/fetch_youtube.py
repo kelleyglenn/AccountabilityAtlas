@@ -33,12 +33,17 @@ except ImportError:
 # --- YouTube fetching ---
 
 
-def fetch_youtube_metadata(url: str, include_transcript: bool = True) -> dict:
+def fetch_youtube_metadata(
+    url: str,
+    include_transcript: bool = True,
+    cookies_from_browser: str | None = None,
+) -> dict:
     """Fetch video metadata and optionally transcript from YouTube using yt-dlp.
 
     Args:
         url: YouTube video URL.
         include_transcript: Whether to attempt fetching auto-generated subtitles.
+        cookies_from_browser: Browser name to read cookies from (e.g., "firefox").
 
     Returns:
         Dictionary with keys: url, title, description, channel, thumbnail,
@@ -52,6 +57,9 @@ def fetch_youtube_metadata(url: str, include_transcript: bool = True) -> dict:
         "sleep_requests": 0.75,
         "sleep_interval": 2,
     }
+
+    if cookies_from_browser:
+        ydl_opts["cookiesfrombrowser"] = (cookies_from_browser,)
 
     if include_transcript:
         ydl_opts.update(
@@ -281,6 +289,87 @@ def _load_existing_output(output_path: Path) -> tuple[list, set]:
     return entries, urls
 
 
+def _validate_args(parser, args) -> None:
+    """Validate CLI argument combinations."""
+    if not args.url and not args.file:
+        parser.error("Provide either a URL argument or --file with a file of URLs.")
+    if args.url and args.file:
+        parser.error("Provide either a URL argument or --file, not both.")
+    if args.append and not args.output:
+        parser.error("--append requires --output.")
+
+
+def _filter_existing_urls(urls: list[str], existing_urls: set) -> list[str]:
+    """Remove already-fetched URLs and report skipped count."""
+    if not existing_urls:
+        return urls
+
+    filtered = [u for u in urls if u not in existing_urls]
+    skipped = len(urls) - len(filtered)
+    if skipped:
+        print(f"Skipping {skipped} already-fetched URL(s).", file=sys.stderr)
+    return filtered
+
+
+def _fetch_all(
+    urls: list[str],
+    include_transcript: bool,
+    cookies_from_browser: str | None,
+    output_path: Path | None,
+    delay: float,
+    results: list[dict],
+) -> list[str]:
+    """Fetch metadata for all URLs, writing incrementally. Returns errors list."""
+    errors = []
+
+    for i, url in enumerate(urls, 1):
+        print(f"\n[{i}/{len(urls)}] Fetching metadata for: {url}", file=sys.stderr)
+        try:
+            data = fetch_youtube_metadata(
+                url, include_transcript=include_transcript,
+                cookies_from_browser=cookies_from_browser,
+            )
+            results.append(data)
+
+            if include_transcript and data.get("transcript") is None:
+                print("  Warning: No transcript available for this video.", file=sys.stderr)
+            print(f"  Done: {data.get('title', 'Unknown')}", file=sys.stderr)
+
+            if output_path:
+                _write_json_output(output_path, results)
+            if delay > 0 and i < len(urls):
+                time.sleep(delay)
+        except Exception as e:
+            error_msg = f"Failed to fetch {url}: {e}"
+            print(f"  Error: {error_msg}", file=sys.stderr)
+            errors.append(error_msg)
+
+    return errors
+
+
+def _print_summary(
+    output_path: Path | None,
+    output_arg: str | None,
+    results: list[dict],
+    existing_count: int,
+    errors: list[str],
+) -> None:
+    """Print final output and summary."""
+    if output_path:
+        print(f"\nWrote {len(results)} entries to {output_arg}.", file=sys.stderr)
+    else:
+        print(json.dumps(results, indent=2, ensure_ascii=False))
+
+    new_count = len(results) - existing_count
+    if errors:
+        print(f"\nCompleted with {len(errors)} error(s):", file=sys.stderr)
+        for err in errors:
+            print(f"  - {err}", file=sys.stderr)
+        sys.exit(1 if new_count == 0 else 0)
+    else:
+        print(f"\nSuccessfully fetched {new_count} URL(s).", file=sys.stderr)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Fetch YouTube video metadata and transcripts for AccountabilityAtlas.",
@@ -320,93 +409,47 @@ def main():
         default=0,
         help="Seconds to wait between videos (default: 0). Use 5-10 to avoid rate limiting.",
     )
+    parser.add_argument(
+        "--cookies-from-browser",
+        type=str,
+        default=None,
+        metavar="BROWSER",
+        help="Browser to read YouTube cookies from (e.g., firefox, chrome). Raises rate limits ~6x.",
+    )
 
     args = parser.parse_args()
+    _validate_args(parser, args)
 
-    # Validate arguments
-    if not args.url and not args.file:
-        parser.error("Provide either a URL argument or --file with a file of URLs.")
-    if args.url and args.file:
-        parser.error("Provide either a URL argument or --file, not both.")
-    if args.append and not args.output:
-        parser.error("--append requires --output.")
-
-    # Collect URLs
     urls = _collect_urls(args)
-
     if not urls:
         print("Error: No URLs to process.", file=sys.stderr)
         sys.exit(1)
 
-    include_transcript = not args.no_transcript
-
     # Load existing entries if appending
     existing_entries = []
-    existing_urls = set()
     if args.append and args.output:
         existing_entries, existing_urls = _load_existing_output(Path(args.output))
-
-    # Filter out already-fetched URLs when appending
-    if existing_urls:
-        original_count = len(urls)
-        urls = [u for u in urls if u not in existing_urls]
-        skipped = original_count - len(urls)
-        if skipped:
-            print(f"Skipping {skipped} already-fetched URL(s).", file=sys.stderr)
+        urls = _filter_existing_urls(urls, existing_urls)
 
     if not urls and existing_entries:
         print("All URLs already fetched. Nothing to do.", file=sys.stderr)
         sys.exit(0)
 
-    # Fetch metadata for each URL
     results = list(existing_entries)
-    errors = []
     output_path = Path(args.output) if args.output else None
-
     if output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    for i, url in enumerate(urls, 1):
-        print(f"\n[{i}/{len(urls)}] Fetching metadata for: {url}", file=sys.stderr)
-        try:
-            data = fetch_youtube_metadata(url, include_transcript=include_transcript)
-            results.append(data)
+    errors = _fetch_all(
+        urls,
+        include_transcript=not args.no_transcript,
+        cookies_from_browser=args.cookies_from_browser,
+        output_path=output_path,
+        delay=args.delay,
+        results=results,
+    )
 
-            has_transcript = data.get("transcript") is not None
-            if include_transcript and not has_transcript:
-                print(
-                    "  Warning: No transcript available for this video.",
-                    file=sys.stderr,
-                )
-            print(f"  Done: {data.get('title', 'Unknown')}", file=sys.stderr)
-
-            # Write incrementally so progress survives interruptions
-            if output_path:
-                _write_json_output(output_path, results)
-
-            # Delay between videos to avoid rate limiting
-            if args.delay > 0 and i < len(urls):
-                time.sleep(args.delay)
-        except Exception as e:
-            error_msg = f"Failed to fetch {url}: {e}"
-            print(f"  Error: {error_msg}", file=sys.stderr)
-            errors.append(error_msg)
-
-    # Final output (stdout mode, or summary for file mode)
-    if output_path:
-        print(f"\nWrote {len(results)} entries to {args.output}.", file=sys.stderr)
-    else:
-        print(json.dumps(results, indent=2, ensure_ascii=False))
-
-    # Summary
-    new_count = len(results) - len(existing_entries)
-    if errors:
-        print(f"\nCompleted with {len(errors)} error(s):", file=sys.stderr)
-        for err in errors:
-            print(f"  - {err}", file=sys.stderr)
-        sys.exit(1 if new_count == 0 else 0)
-    else:
-        print(f"\nSuccessfully fetched {new_count} URL(s).", file=sys.stderr)
+    _print_summary(output_path, args.output, results, len(existing_entries), errors)
 
 
 if __name__ == "__main__":
