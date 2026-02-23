@@ -27,6 +27,18 @@ except ImportError:
     sys.exit(1)
 
 
+_CHANNEL_PATH_SUFFIXES = ("/videos", "/shorts", "/streams", "/playlists", "/community")
+
+
+def _strip_channel_path_suffix(url: str) -> str:
+    """Strip known YouTube channel path suffixes from a URL."""
+    url = url.rstrip("/")
+    for suffix in _CHANNEL_PATH_SUFFIXES:
+        if url.endswith(suffix):
+            return url[: -len(suffix)]
+    return url
+
+
 def normalize_channel_url(channel: str) -> str:
     """Normalize a channel identifier to a full YouTube URL with /videos suffix.
 
@@ -41,14 +53,8 @@ def normalize_channel_url(channel: str) -> str:
     channel = channel.strip()
 
     # Already a full URL
-    if channel.startswith("http://") or channel.startswith("https://"):
-        # Strip trailing slashes and path suffixes like /videos, /shorts, /streams
-        url = channel.rstrip("/")
-        for suffix in ("/videos", "/shorts", "/streams", "/playlists", "/community"):
-            if url.endswith(suffix):
-                url = url[: -len(suffix)]
-                break
-        return url + "/videos"
+    if channel.startswith(("http://", "https://")):
+        return _strip_channel_path_suffix(channel) + "/videos"
 
     # @handle
     if channel.startswith("@"):
@@ -79,6 +85,19 @@ def _build_ydl_opts(max_results: int | None) -> dict:
     return opts
 
 
+def _is_outside_date_range(
+    upload_date: str, after_date: str | None, before_date: str | None
+) -> bool:
+    """Check if an upload date falls outside the specified range."""
+    if not upload_date:
+        return False
+    if after_date and upload_date < after_date:
+        return True
+    if before_date and upload_date > before_date:
+        return True
+    return False
+
+
 def _parse_entry(
     entry: dict | None,
     min_duration: int,
@@ -93,13 +112,9 @@ def _parse_entry(
     if duration < min_duration:
         return None
 
-    # Date filtering — upload_date is YYYYMMDD from yt-dlp
     upload_date = entry.get("upload_date", "")
-    if upload_date and (after_date or before_date):
-        if after_date and upload_date < after_date:
-            return None
-        if before_date and upload_date > before_date:
-            return None
+    if _is_outside_date_range(upload_date, after_date, before_date):
+        return None
 
     video_url = entry.get("webpage_url") or entry.get("url", "")
     if not video_url:
@@ -181,6 +196,17 @@ def format_output(videos: list[dict], channel_name: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _parse_date_arg(parser, value: str | None, name: str) -> str | None:
+    """Validate a YYYY-MM-DD date argument and convert to YYYYMMDD."""
+    if value is None:
+        return None
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        parser.error(f"{name} must be in YYYY-MM-DD format, got: {value}")
+    return value.replace("-", "")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="List YouTube video URLs from a channel for AccountabilityAtlas.",
@@ -226,18 +252,8 @@ def main():
     args = parser.parse_args()
 
     # Validate date formats and convert to YYYYMMDD for yt-dlp comparison
-    after_yyyymmdd = None
-    before_yyyymmdd = None
-    for date_arg, name in [(args.after, "--after"), (args.before, "--before")]:
-        if date_arg is not None:
-            try:
-                datetime.strptime(date_arg, "%Y-%m-%d")
-            except ValueError:
-                parser.error(f"{name} must be in YYYY-MM-DD format, got: {date_arg}")
-    if args.after:
-        after_yyyymmdd = args.after.replace("-", "")
-    if args.before:
-        before_yyyymmdd = args.before.replace("-", "")
+    after_yyyymmdd = _parse_date_arg(parser, args.after, "--after")
+    before_yyyymmdd = _parse_date_arg(parser, args.before, "--before")
 
     channel_url = normalize_channel_url(args.channel)
 

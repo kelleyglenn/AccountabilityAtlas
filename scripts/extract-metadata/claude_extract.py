@@ -347,6 +347,19 @@ def build_batch_user_message(
 # --- JSON extraction ---
 
 
+def _strip_code_fences(text: str) -> str:
+    """Strip markdown code fences (```...```) from text."""
+    if not text.startswith("```"):
+        return text
+    first_newline = text.find("\n")
+    if first_newline < 0:
+        return text
+    last_fence = text.rfind("```")
+    if last_fence <= first_newline:
+        return text
+    return text[first_newline + 1 : last_fence].strip()
+
+
 def _extract_json(text: str) -> str:
     """Extract the last top-level JSON object from the response text.
 
@@ -355,15 +368,7 @@ def _extract_json(text: str) -> str:
     This finds the last balanced {...} block in the response, matching
     the Java service's extractJson logic.
     """
-    trimmed = text.strip()
-
-    # Handle code fences if present
-    if trimmed.startswith("```"):
-        first_newline = trimmed.index("\n") if "\n" in trimmed else -1
-        if first_newline >= 0:
-            last_fence = trimmed.rfind("```")
-            if last_fence > first_newline:
-                trimmed = trimmed[first_newline + 1 : last_fence].strip()
+    trimmed = _strip_code_fences(text.strip())
 
     # Find the last '}' and walk back to find its matching '{'
     last_brace = trimmed.rfind("}")
@@ -487,6 +492,38 @@ def process_single(
     return entry
 
 
+def _process_batch_entry(
+    entry,
+    yt_data: dict,
+    url: str,
+    results: list[dict],
+    errors: list[str],
+) -> None:
+    """Process a single result from the Message Batches API response."""
+    result_type = entry.result.type
+
+    if result_type != "succeeded":
+        _ERROR_MESSAGES = {
+            "errored": lambda: f"API error for {url}: "
+            + getattr(entry.result.error, "message", str(entry.result.error)),
+            "expired": lambda: f"Request expired for {url}",
+            "canceled": lambda: f"Request canceled for {url}",
+        }
+        msg_fn = _ERROR_MESSAGES.get(result_type)
+        if msg_fn:
+            errors.append(msg_fn())
+        return
+
+    try:
+        raw_text = entry.result.message.content[0].text.strip()
+        json_str = _extract_json(raw_text)
+        claude_metadata = json.loads(json_str)
+        results.append(build_output_entry(url, yt_data, claude_metadata))
+        print(f"  Processed: {yt_data.get('title', url)}", file=sys.stderr)
+    except (json.JSONDecodeError, IndexError, KeyError) as e:
+        errors.append(f"Failed to parse response for {url}: {e}")
+
+
 def process_batch(
     youtube_data_list: list[dict],
     client: anthropic.Anthropic,
@@ -581,25 +618,36 @@ def process_batch(
             continue
         yt_data = youtube_data_list[idx]
         url = yt_data.get("url", video_id)
-
-        if entry.result.type == "succeeded":
-            try:
-                raw_text = entry.result.message.content[0].text.strip()
-                json_str = _extract_json(raw_text)
-                claude_metadata = json.loads(json_str)
-                results.append(build_output_entry(url, yt_data, claude_metadata))
-                print(f"  Processed: {yt_data.get('title', url)}", file=sys.stderr)
-            except (json.JSONDecodeError, IndexError, KeyError) as e:
-                errors.append(f"Failed to parse response for {url}: {e}")
-        elif entry.result.type == "errored":
-            error_msg = getattr(entry.result.error, "message", str(entry.result.error))
-            errors.append(f"API error for {url}: {error_msg}")
-        elif entry.result.type == "expired":
-            errors.append(f"Request expired for {url}")
-        elif entry.result.type == "canceled":
-            errors.append(f"Request canceled for {url}")
+        _process_batch_entry(entry, yt_data, url, results, errors)
 
     return results, errors
+
+
+def _load_json_array(path: Path, label: str) -> list:
+    """Load and validate a JSON array from a file, exiting on error."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"Error: Failed to parse {label} {path}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if not isinstance(data, list):
+        print(f"Error: {label} {path} does not contain a JSON array.", file=sys.stderr)
+        sys.exit(1)
+
+    return data
+
+
+def _load_existing_output(output_path: Path) -> tuple[list, set]:
+    """Load existing entries from output file for append mode."""
+    if not output_path.exists():
+        return [], set()
+
+    entries = _load_json_array(output_path, "Existing file")
+    urls = {entry.get("youtubeUrl") for entry in entries}
+    print(f"Loaded {len(entries)} existing entries from {output_path}.", file=sys.stderr)
+    return entries, urls
 
 
 def main():
@@ -652,18 +700,7 @@ def main():
         print(f"Error: Input file not found: {args.input}", file=sys.stderr)
         sys.exit(1)
 
-    try:
-        with open(input_path, "r", encoding="utf-8") as f:
-            youtube_data_list = json.load(f)
-        if not isinstance(youtube_data_list, list):
-            print(
-                f"Error: Input file {args.input} does not contain a JSON array.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-    except json.JSONDecodeError as e:
-        print(f"Error: Failed to parse input file {args.input}: {e}", file=sys.stderr)
-        sys.exit(1)
+    youtube_data_list = _load_json_array(input_path, "Input file")
 
     if not youtube_data_list:
         print("Error: Input file contains no entries.", file=sys.stderr)
@@ -685,28 +722,7 @@ def main():
     existing_entries = []
     existing_urls = set()
     if args.append and args.output:
-        output_path = Path(args.output)
-        if output_path.exists():
-            try:
-                with open(output_path, "r", encoding="utf-8") as f:
-                    existing_entries = json.load(f)
-                if not isinstance(existing_entries, list):
-                    print(
-                        f"Error: Existing file {args.output} does not contain a JSON array.",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
-                existing_urls = {entry.get("youtubeUrl") for entry in existing_entries}
-                print(
-                    f"Loaded {len(existing_entries)} existing entries from {args.output}.",
-                    file=sys.stderr,
-                )
-            except json.JSONDecodeError as e:
-                print(
-                    f"Error: Failed to parse existing file {args.output}: {e}",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+        existing_entries, existing_urls = _load_existing_output(Path(args.output))
 
     # Filter out already-processed entries when appending
     if existing_urls:

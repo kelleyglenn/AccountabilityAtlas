@@ -85,6 +85,32 @@ def fetch_youtube_metadata(url: str, include_transcript: bool = True) -> dict:
     }
 
 
+def _fetch_subtitle_from_url(url: str) -> str | None:
+    """Fetch subtitle data from a URL with retry on rate limiting."""
+    import urllib.request
+
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(url, timeout=15) as resp:
+                return resp.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < 2:
+                wait = 5 * (attempt + 1)
+                print(
+                    f"  Subtitle fetch rate-limited, retrying in {wait}s...",
+                    file=sys.stderr,
+                )
+                time.sleep(wait)
+                continue
+            print(f"  Subtitle fetch failed: {e}", file=sys.stderr)
+            return None
+        except Exception as e:
+            print(f"  Subtitle fetch failed: {e}", file=sys.stderr)
+            return None
+
+    return None
+
+
 def _extract_transcript(info: dict) -> str | None:
     """Extract transcript text from yt-dlp subtitle data.
 
@@ -104,75 +130,74 @@ def _extract_transcript(info: dict) -> str | None:
 
     # If yt-dlp provided a URL but no inline data, we need to fetch it
     sub_url = en_sub.get("url")
-    if sub_url:
-        import urllib.request
+    if not sub_url:
+        return None
 
-        for attempt in range(3):
-            try:
-                with urllib.request.urlopen(sub_url, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                return _parse_subtitle_data(raw, en_sub.get("ext", ""))
-            except urllib.error.HTTPError as e:
-                if e.code == 429 and attempt < 2:
-                    wait = 5 * (attempt + 1)
-                    print(
-                        f"  Subtitle fetch rate-limited, retrying in {wait}s...",
-                        file=sys.stderr,
-                    )
-                    time.sleep(wait)
-                else:
-                    print(f"  Subtitle fetch failed: {e}", file=sys.stderr)
-                    return None
-            except Exception as e:
-                print(f"  Subtitle fetch failed: {e}", file=sys.stderr)
-                return None
+    raw = _fetch_subtitle_from_url(sub_url)
+    if raw is None:
+        return None
+    return _parse_subtitle_data(raw, en_sub.get("ext", ""))
 
-    return None
+
+def _parse_json3_subtitles(data: str) -> str | None:
+    """Parse json3 format subtitle data into plain text."""
+    try:
+        parsed = json.loads(data)
+    except (json.JSONDecodeError, KeyError):
+        return None
+
+    segments = []
+    for event in parsed.get("events", []):
+        for seg in event.get("segs", []):
+            text = seg.get("utf8", "").strip()
+            if text and text != "\n":
+                segments.append(text)
+
+    return " ".join(segments) if segments else None
+
+
+def _is_vtt_metadata_line(line: str) -> bool:
+    """Check if a line is a VTT/SRV metadata line that should be skipped."""
+    if not line:
+        return True
+    if "-->" in line:
+        return True
+    if line.startswith(("WEBVTT", "Kind:", "Language:")):
+        return True
+    return line.isdigit()
+
+
+def _parse_vtt_subtitles(data: str) -> str | None:
+    """Parse VTT/SRV format subtitle data into plain text."""
+    lines = []
+    for raw_line in data.splitlines():
+        line = raw_line.strip()
+        if _is_vtt_metadata_line(line):
+            continue
+        # Remove HTML-style tags (e.g. <c>, </c>, <00:01:02.345>)
+        clean = re.sub(r"<[^>]+>", "", line).strip()
+        if clean:
+            lines.append(clean)
+
+    if not lines:
+        return None
+
+    # Deduplicate consecutive identical lines (common in vtt)
+    deduped = [lines[0]]
+    for ln in lines[1:]:
+        if ln != deduped[-1]:
+            deduped.append(ln)
+    return " ".join(deduped)
 
 
 def _parse_subtitle_data(data: str, ext: str) -> str | None:
     """Parse subtitle data from various formats into plain text."""
     if ext == "json3":
-        try:
-            parsed = json.loads(data)
-            segments = []
-            for event in parsed.get("events", []):
-                for seg in event.get("segs", []):
-                    text = seg.get("utf8", "").strip()
-                    if text and text != "\n":
-                        segments.append(text)
-            if segments:
-                return " ".join(segments)
-        except (json.JSONDecodeError, KeyError):
-            pass
+        result = _parse_json3_subtitles(data)
+        if result:
+            return result
 
-    # Fallback: strip timing lines from vtt/srv formats
-    lines = []
-    for line in data.splitlines():
-        line = line.strip()
-        # Skip empty lines, timing lines, WEBVTT headers, and numeric cue IDs
-        if not line:
-            continue
-        if "-->" in line:
-            continue
-        if line.startswith("WEBVTT") or line.startswith("Kind:") or line.startswith("Language:"):
-            continue
-        if line.isdigit():
-            continue
-        # Remove HTML-style tags (e.g. <c>, </c>, <00:01:02.345>)
-        clean = re.sub(r"<[^>]+>", "", line)
-        if clean.strip():
-            lines.append(clean.strip())
-
-    if lines:
-        # Deduplicate consecutive identical lines (common in vtt)
-        deduped = [lines[0]]
-        for ln in lines[1:]:
-            if ln != deduped[-1]:
-                deduped.append(ln)
-        return " ".join(deduped)
-
-    return None
+    return _parse_vtt_subtitles(data)
 
 
 def _pick_best_thumbnail(info: dict) -> str | None:
@@ -209,6 +234,53 @@ def _pick_best_thumbnail(info: dict) -> str | None:
     return thumbnail
 
 
+def _collect_urls(args) -> list[str]:
+    """Collect URLs from command-line arguments or file."""
+    if args.url:
+        return [args.url.strip()]
+
+    file_path = Path(args.file)
+    if not file_path.exists():
+        print(f"Error: File not found: {args.file}", file=sys.stderr)
+        sys.exit(1)
+
+    urls = []
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                urls.append(line)
+    return urls
+
+
+def _write_json_output(path: Path, data: list) -> None:
+    """Write a JSON array to a file."""
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+
+def _load_existing_output(output_path: Path) -> tuple[list, set]:
+    """Load existing entries from output file for append mode."""
+    if not output_path.exists():
+        return [], set()
+
+    try:
+        with open(output_path, "r", encoding="utf-8") as f:
+            entries = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"Error: Failed to parse existing file {output_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if not isinstance(entries, list):
+        print(f"Error: Existing file {output_path} does not contain a JSON array.", file=sys.stderr)
+        sys.exit(1)
+
+    urls = {entry.get("url") for entry in entries}
+    print(f"Loaded {len(entries)} existing entries from {output_path}.", file=sys.stderr)
+    return entries, urls
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Fetch YouTube video metadata and transcripts for AccountabilityAtlas.",
@@ -241,6 +313,13 @@ def main():
         action="store_true",
         help="Append to existing output file, skipping URLs already present.",
     )
+    parser.add_argument(
+        "--delay",
+        "-d",
+        type=float,
+        default=0,
+        help="Seconds to wait between videos (default: 0). Use 5-10 to avoid rate limiting.",
+    )
 
     args = parser.parse_args()
 
@@ -253,19 +332,7 @@ def main():
         parser.error("--append requires --output.")
 
     # Collect URLs
-    urls = []
-    if args.url:
-        urls.append(args.url.strip())
-    else:
-        file_path = Path(args.file)
-        if not file_path.exists():
-            print(f"Error: File not found: {args.file}", file=sys.stderr)
-            sys.exit(1)
-        with open(file_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    urls.append(line)
+    urls = _collect_urls(args)
 
     if not urls:
         print("Error: No URLs to process.", file=sys.stderr)
@@ -277,28 +344,7 @@ def main():
     existing_entries = []
     existing_urls = set()
     if args.append and args.output:
-        output_path = Path(args.output)
-        if output_path.exists():
-            try:
-                with open(output_path, "r", encoding="utf-8") as f:
-                    existing_entries = json.load(f)
-                if not isinstance(existing_entries, list):
-                    print(
-                        f"Error: Existing file {args.output} does not contain a JSON array.",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
-                existing_urls = {entry.get("url") for entry in existing_entries}
-                print(
-                    f"Loaded {len(existing_entries)} existing entries from {args.output}.",
-                    file=sys.stderr,
-                )
-            except json.JSONDecodeError as e:
-                print(
-                    f"Error: Failed to parse existing file {args.output}: {e}",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+        existing_entries, existing_urls = _load_existing_output(Path(args.output))
 
     # Filter out already-fetched URLs when appending
     if existing_urls:
@@ -315,6 +361,10 @@ def main():
     # Fetch metadata for each URL
     results = list(existing_entries)
     errors = []
+    output_path = Path(args.output) if args.output else None
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
     for i, url in enumerate(urls, 1):
         print(f"\n[{i}/{len(urls)}] Fetching metadata for: {url}", file=sys.stderr)
@@ -329,23 +379,24 @@ def main():
                     file=sys.stderr,
                 )
             print(f"  Done: {data.get('title', 'Unknown')}", file=sys.stderr)
+
+            # Write incrementally so progress survives interruptions
+            if output_path:
+                _write_json_output(output_path, results)
+
+            # Delay between videos to avoid rate limiting
+            if args.delay > 0 and i < len(urls):
+                time.sleep(args.delay)
         except Exception as e:
             error_msg = f"Failed to fetch {url}: {e}"
             print(f"  Error: {error_msg}", file=sys.stderr)
             errors.append(error_msg)
 
-    # Output results
-    output_json = json.dumps(results, indent=2, ensure_ascii=False)
-
-    if args.output:
-        output_path = Path(args.output)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(output_json)
-            f.write("\n")
+    # Final output (stdout mode, or summary for file mode)
+    if output_path:
         print(f"\nWrote {len(results)} entries to {args.output}.", file=sys.stderr)
     else:
-        print(output_json)
+        print(json.dumps(results, indent=2, ensure_ascii=False))
 
     # Summary
     new_count = len(results) - len(existing_entries)
