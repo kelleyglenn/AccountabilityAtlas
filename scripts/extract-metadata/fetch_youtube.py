@@ -16,6 +16,7 @@ import argparse
 import json
 import re
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -40,6 +41,9 @@ def fetch_youtube_metadata(
 ) -> dict:
     """Fetch video metadata and optionally transcript from YouTube using yt-dlp.
 
+    Subtitles are downloaded by yt-dlp to a temp directory (rather than fetched
+    separately) so that cookies and rate-limit handling are applied consistently.
+
     Args:
         url: YouTube video URL.
         include_transcript: Whether to attempt fetching auto-generated subtitles.
@@ -53,7 +57,7 @@ def fetch_youtube_metadata(
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
-        "format": "best",
+        "ignore_no_formats_error": True,
         "sleep_requests": 0.75,
         "sleep_interval": 2,
     }
@@ -72,12 +76,15 @@ def fetch_youtube_metadata(
             }
         )
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ydl_opts["outtmpl"] = str(Path(tmpdir) / "%(id)s.%(ext)s")
 
-    transcript = None
-    if include_transcript:
-        transcript = _extract_transcript(info)
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+
+        transcript = None
+        if include_transcript:
+            transcript = _read_subtitle_file(tmpdir, info.get("id", ""))
 
     thumbnail = _pick_best_thumbnail(info)
 
@@ -93,58 +100,17 @@ def fetch_youtube_metadata(
     }
 
 
-def _fetch_subtitle_from_url(url: str) -> str | None:
-    """Fetch subtitle data from a URL with retry on rate limiting."""
-    import urllib.request
+def _read_subtitle_file(tmpdir: str, video_id: str) -> str | None:
+    """Read a subtitle file written by yt-dlp from a temp directory.
 
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(url, timeout=15) as resp:
-                return resp.read().decode("utf-8", errors="replace")
-        except urllib.error.HTTPError as e:
-            if e.code == 429 and attempt < 2:
-                wait = 5 * (attempt + 1)
-                print(
-                    f"  Subtitle fetch rate-limited, retrying in {wait}s...",
-                    file=sys.stderr,
-                )
-                time.sleep(wait)
-                continue
-            print(f"  Subtitle fetch failed: {e}", file=sys.stderr)
-            return None
-        except Exception as e:
-            print(f"  Subtitle fetch failed: {e}", file=sys.stderr)
-            return None
-
-    return None
-
-
-def _extract_transcript(info: dict) -> str | None:
-    """Extract transcript text from yt-dlp subtitle data.
-
-    yt-dlp stores fetched subtitles under 'requested_subtitles' when available.
-    The json3 format contains an 'events' list with 'segs' (segments) containing 'utf8' text.
-    Falls back to vtt/srv format text parsing if json3 is unavailable.
+    yt-dlp writes subtitle files as {id}.{lang}.{ext} (e.g., dQw4w9WgXcQ.en.json3).
     """
-    subs = info.get("requested_subtitles") or {}
-    en_sub = subs.get("en")
-    if not en_sub:
-        return None
-
-    # If yt-dlp returned the subtitle data directly (json3 format)
-    sub_data = en_sub.get("data")
-    if sub_data:
-        return _parse_subtitle_data(sub_data, en_sub.get("ext", ""))
-
-    # If yt-dlp provided a URL but no inline data, we need to fetch it
-    sub_url = en_sub.get("url")
-    if not sub_url:
-        return None
-
-    raw = _fetch_subtitle_from_url(sub_url)
-    if raw is None:
-        return None
-    return _parse_subtitle_data(raw, en_sub.get("ext", ""))
+    for ext in ("json3", "vtt", "srv1", "srv2", "srv3", "ttml"):
+        sub_path = Path(tmpdir) / f"{video_id}.en.{ext}"
+        if sub_path.exists():
+            data = sub_path.read_text(encoding="utf-8")
+            return _parse_subtitle_data(data, ext)
+    return None
 
 
 def _parse_json3_subtitles(data: str) -> str | None:
@@ -311,6 +277,11 @@ def _filter_existing_urls(urls: list[str], existing_urls: set) -> list[str]:
     return filtered
 
 
+def _is_rate_limited(error: Exception) -> bool:
+    """Check if an error indicates YouTube rate limiting."""
+    return "429" in str(error)
+
+
 def _fetch_all(
     urls: list[str],
     include_transcript: bool,
@@ -319,7 +290,11 @@ def _fetch_all(
     delay: float,
     results: list[dict],
 ) -> list[str]:
-    """Fetch metadata for all URLs, writing incrementally. Returns errors list."""
+    """Fetch metadata for all URLs, writing incrementally. Returns errors list.
+
+    Stops immediately on rate limiting (429) since subsequent requests
+    will also fail. Progress is preserved via incremental writes.
+    """
     errors = []
 
     for i, url in enumerate(urls, 1):
@@ -340,6 +315,22 @@ def _fetch_all(
             if delay > 0 and i < len(urls):
                 time.sleep(delay)
         except Exception as e:
+            if _is_rate_limited(e):
+                remaining = len(urls) - i
+                print(
+                    f"\n  Rate limited by YouTube (HTTP 429). Stopping.",
+                    file=sys.stderr,
+                )
+                print(
+                    f"  {len(results)} video(s) saved. {remaining} remaining.",
+                    file=sys.stderr,
+                )
+                print(
+                    f"  Wait for the rate limit to clear, then re-run with --append.",
+                    file=sys.stderr,
+                )
+                errors.append(f"Rate limited at video {i}/{len(urls)}: {url}")
+                break
             error_msg = f"Failed to fetch {url}: {e}"
             print(f"  Error: {error_msg}", file=sys.stderr)
             errors.append(error_msg)
