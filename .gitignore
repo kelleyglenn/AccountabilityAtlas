@@ -49,6 +49,7 @@ infra/*.tfvars
 
 # Seed data (generated, keep local)
 seed-data/*.json
+seed-data/*.txt
 
 # AWS deployment config
 scripts/aws/config.env

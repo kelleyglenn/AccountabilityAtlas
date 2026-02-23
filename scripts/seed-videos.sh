@@ -100,18 +100,18 @@ for i in $(seq 0 $((TOTAL - 1))); do
     LAT=$(echo "$ENTRY" | jq '.location.latitude')
     LNG=$(echo "$ENTRY" | jq '.location.longitude')
     LOC_NAME=$(echo "$ENTRY" | jq -r '.location.name // empty')
+    LOC_STREET=$(echo "$ENTRY" | jq -r '.location.streetAddress // empty')
     LOC_CITY=$(echo "$ENTRY" | jq -r '.location.city // empty')
     LOC_STATE=$(echo "$ENTRY" | jq -r '.location.state // empty')
 
-    # If no lat/lng, try geocoding from name/city/state
+    # If no lat/lng, try geocoding from streetAddress (requires a street address)
     if [[ "$LAT" == "null" || "$LNG" == "null" ]]; then
-      ADDRESS_PARTS=""
-      [[ -n "$LOC_NAME" ]] && ADDRESS_PARTS="$LOC_NAME"
-      [[ -n "$LOC_CITY" ]] && ADDRESS_PARTS="${ADDRESS_PARTS:+$ADDRESS_PARTS, }$LOC_CITY"
-      [[ -n "$LOC_STATE" ]] && ADDRESS_PARTS="${ADDRESS_PARTS:+$ADDRESS_PARTS, }$LOC_STATE"
+      if [[ -n "$LOC_STREET" ]]; then
+        ADDRESS_PARTS="$LOC_STREET"
+        [[ -n "$LOC_CITY" ]] && ADDRESS_PARTS="$ADDRESS_PARTS, $LOC_CITY"
+        [[ -n "$LOC_STATE" ]] && ADDRESS_PARTS="$ADDRESS_PARTS, $LOC_STATE"
 
-      if [[ -n "$ADDRESS_PARTS" ]]; then
-        ENCODED_ADDRESS=$(echo "$ADDRESS_PARTS" | python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))" 2>/dev/null || echo "$ADDRESS_PARTS")
+        ENCODED_ADDRESS=$(printf '%s' "$ADDRESS_PARTS" | jq -sRr '@uri')
         GEOCODE_RESPONSE=$(curl -s -w "\n%{http_code}" \
           "$API_URL/locations/geocode?address=$ENCODED_ADDRESS" \
           -H "$AUTH_HEADER")
@@ -119,8 +119,8 @@ for i in $(seq 0 $((TOTAL - 1))); do
         GEO_BODY=$(echo "$GEOCODE_RESPONSE" | sed '$d')
 
         if [[ "$GEO_CODE" == "200" ]]; then
-          LAT=$(echo "$GEO_BODY" | jq '.latitude')
-          LNG=$(echo "$GEO_BODY" | jq '.longitude')
+          LAT=$(echo "$GEO_BODY" | jq '.coordinates.latitude')
+          LNG=$(echo "$GEO_BODY" | jq '.coordinates.longitude')
         fi
       fi
     fi
@@ -150,8 +150,22 @@ for i in $(seq 0 $((TOTAL - 1))); do
 
       if [[ "$LOC_CODE" == "201" ]]; then
         LOCATION_ID=$(echo "$LOC_BODY_RESP" | jq -r '.id')
+      elif [[ "$LOC_CODE" == "409" ]]; then
+        # Location already exists — use the existing one
+        LOCATION_ID=$(echo "$LOC_BODY_RESP" | jq -r '.existingLocationId // empty')
+        if [[ -z "$LOCATION_ID" ]]; then
+          warn "  Location 409 but no existingLocationId in response"
+        fi
       fi
     fi
+  fi
+
+  # Skip video if no location could be created (locationId is required by the API)
+  if [[ -z "$LOCATION_ID" ]]; then
+    echo -e "${RED}failed (no location)${NC}"
+    warn "  Could not create or geocode location — locationId is required"
+    FAILED=$((FAILED + 1))
+    continue
   fi
 
   # Build video creation request
@@ -164,14 +178,14 @@ for i in $(seq 0 $((TOTAL - 1))); do
     --argjson amendments "$AMENDMENTS" \
     --argjson participants "$PARTICIPANTS" \
     --arg videoDate "${VIDEO_DATE:-}" \
-    --arg locationId "${LOCATION_ID:-}" \
+    --arg locationId "$LOCATION_ID" \
     '{
       youtubeUrl: $youtubeUrl,
       amendments: $amendments,
-      participants: $participants
+      participants: $participants,
+      locationId: $locationId
     }
-    + (if $videoDate != "" then { videoDate: $videoDate } else {} end)
-    + (if $locationId != "" then { locationId: $locationId } else {} end)')
+    + (if $videoDate != "" then { videoDate: $videoDate } else {} end)')
 
   # Create video
   VIDEO_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/videos" \
