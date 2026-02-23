@@ -48,8 +48,8 @@ infra/*.tfvars
 !infra/example.tfvars
 
 # Seed data (generated, keep local)
-seed-data/*.json
-seed-data/*.txt
+seed-data/**
+!seed-data/.gitkeep
 
 # AWS deployment config
 scripts/aws/config.env
