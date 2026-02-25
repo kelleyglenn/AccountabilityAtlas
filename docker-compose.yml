@@ -191,6 +191,9 @@ services:
       SPRING_FLYWAY_PASSWORD: local_dev  # dev-only
       SPRING_CLOUD_AWS_SQS_ENDPOINT: http://localstack:4566
       SPRING_CLOUD_AWS_REGION_STATIC: us-east-1
+      USER_SERVICE_JWKS_URL: http://user-service:8081/.well-known/jwks.json
+      VIDEO_SERVICE_URL: http://video-service:8082
+      USER_SERVICE_URL: http://user-service:8081
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8085/actuator/health"]
       interval: 10s
@@ -201,6 +204,10 @@ services:
       postgres:
         condition: service_healthy
       localstack:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      video-service:
         condition: service_healthy
     profiles:
       - backend
