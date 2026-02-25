@@ -79,6 +79,7 @@ AUTH_HEADER="Authorization: Bearer $ACCESS_TOKEN"
 TOTAL=$(jq 'length' "$INPUT_FILE")
 CREATED=0
 SKIPPED=0
+FILTERED=0
 FAILED=0
 
 info "Processing $TOTAL videos from $INPUT_FILE..."
@@ -91,6 +92,29 @@ for i in $(seq 0 $((TOTAL - 1))); do
   YOUTUBE_URL=$(echo "$ENTRY" | jq -r '.youtubeUrl')
 
   echo -n "[$((i + 1))/$TOTAL] $TITLE... "
+
+  # --- Quality filters (based on confidence scores) ---
+  FILTER_REASON=$(echo "$ENTRY" | jq -r '
+    def conf: .confidence // {};
+    def loc: .location // {};
+    (conf.location // 1) as $loc_conf |
+    (conf.amendments // 1) as $amend_conf |
+    (conf.participants // 1) as $part_conf |
+    if $loc_conf < 0.55 then
+      "location confidence \($loc_conf)"
+    elif $loc_conf < 0.6 and (loc.name == null or loc.name == "" or loc.streetAddress == null or loc.streetAddress == "") then
+      "location confidence \($loc_conf) without street address"
+    elif $amend_conf < 0.5 and $part_conf < 0.8 then
+      "amendments \($amend_conf) and participants \($part_conf) — likely not accountability content"
+    else
+      empty
+    end')
+
+  if [[ -n "$FILTER_REASON" ]]; then
+    echo -e "${YELLOW}filtered ($FILTER_REASON)${NC}"
+    FILTERED=$((FILTERED + 1))
+    continue
+  fi
 
   # Create location if present
   LOCATION_ID=""
@@ -171,7 +195,11 @@ for i in $(seq 0 $((TOTAL - 1))); do
   # Build video creation request
   AMENDMENTS=$(echo "$ENTRY" | jq -c '.amendments // []')
   PARTICIPANTS=$(echo "$ENTRY" | jq -c '.participants // []')
-  VIDEO_DATE=$(echo "$ENTRY" | jq -r '.videoDate // empty')
+  # Rule 3: Nullify date if confidence is too low
+  VIDEO_DATE=$(echo "$ENTRY" | jq -r '
+    if .videoDate != null and (.confidence.videoDate // 1) >= 0.5 then .videoDate
+    else empty
+    end')
 
   VIDEO_BODY=$(jq -n \
     --arg youtubeUrl "$YOUTUBE_URL" \
@@ -217,10 +245,11 @@ echo ""
 echo "============================================"
 echo "  Seed Summary"
 echo "============================================"
-echo "  Total:   $TOTAL"
-echo -e "  Created: ${GREEN}$CREATED${NC}"
-echo -e "  Skipped: ${YELLOW}$SKIPPED${NC}"
-echo -e "  Failed:  ${RED}$FAILED${NC}"
+echo "  Total:    $TOTAL"
+echo -e "  Created:  ${GREEN}$CREATED${NC}"
+echo -e "  Skipped:  ${YELLOW}$SKIPPED${NC}"
+echo -e "  Filtered: ${YELLOW}$FILTERED${NC}"
+echo -e "  Failed:   ${RED}$FAILED${NC}"
 echo "============================================"
 
 if [[ $FAILED -gt 0 ]]; then
