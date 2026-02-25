@@ -217,11 +217,13 @@ services:
       SPRING_CLOUD_AWS_REGION_STATIC: ${AWS_REGION}
       SPRING_CLOUD_AWS_CREDENTIALS_ACCESS_KEY: ""
       SPRING_CLOUD_AWS_CREDENTIALS_SECRET_KEY: ""
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://user-service:8081/.well-known/jwks.json
+      USER_SERVICE_JWKS_URL: http://user-service:8081/.well-known/jwks.json
       APP_SQS_VIDEO_EVENTS_QUEUE: ${SQS_PREFIX}-video-events
       APP_SQS_USER_EVENTS_QUEUE: ${SQS_PREFIX}-user-events
       APP_SQS_MODERATION_EVENTS_QUEUE: ${SQS_PREFIX}-moderation-events
       APP_SQS_SEARCH_MODERATION_EVENTS_QUEUE: ${SQS_PREFIX}-search-moderation-events
+      VIDEO_SERVICE_URL: http://video-service:8082
+      USER_SERVICE_URL: http://user-service:8081
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8085/actuator/health"]
       interval: 10s
@@ -230,6 +232,8 @@ services:
       start_period: 30s
     depends_on:
       user-service:
+        condition: service_healthy
+      video-service:
         condition: service_healthy
     deploy:
       resources:
