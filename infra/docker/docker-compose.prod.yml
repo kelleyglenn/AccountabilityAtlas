@@ -222,6 +222,8 @@ services:
       APP_SQS_USER_EVENTS_QUEUE: ${SQS_PREFIX}-user-events
       APP_SQS_MODERATION_EVENTS_QUEUE: ${SQS_PREFIX}-moderation-events
       APP_SQS_SEARCH_MODERATION_EVENTS_QUEUE: ${SQS_PREFIX}-search-moderation-events
+      VIDEO_SERVICE_URL: http://video-service:8082
+      USER_SERVICE_URL: http://user-service:8081
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8085/actuator/health"]
       interval: 10s
@@ -230,6 +232,8 @@ services:
       start_period: 30s
     depends_on:
       user-service:
+        condition: service_healthy
+      video-service:
         condition: service_healthy
     deploy:
       resources:
