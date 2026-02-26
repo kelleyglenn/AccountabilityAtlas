@@ -60,6 +60,16 @@ run_sql user_service user_service "
   );
 "
 
+# Reset seed user stats to match seed video data
+# (non-seed videos may have inflated counters before being deleted above)
+run_sql user_service user_service "
+  UPDATE users.user_stats SET
+      submission_count = 0, approved_count = 0, rejected_count = 0, updated_at = NOW();
+  UPDATE users.user_stats SET
+      submission_count = 10, approved_count = 10, rejected_count = 0
+  WHERE user_id = '00000000-0000-0000-0000-000000000003';
+"
+
 # Non-seed users (cascades to any remaining child rows)
 # Temporarily disable the versioning trigger to avoid history inserts
 run_sql user_service user_service "
@@ -134,6 +144,24 @@ run_sql location_service location_service "
   );
 "
 
+# Reset seed location stats to match seed video data
+# (non-seed videos at seed locations may have inflated video_count)
+run_sql location_service location_service "
+  UPDATE locations.location_stats SET video_count = 1
+  WHERE location_id IN (
+    '20000000-0000-0000-0000-000000000001',
+    '20000000-0000-0000-0000-000000000002',
+    '20000000-0000-0000-0000-000000000003',
+    '20000000-0000-0000-0000-000000000004',
+    '20000000-0000-0000-0000-000000000005',
+    '20000000-0000-0000-0000-000000000006',
+    '20000000-0000-0000-0000-000000000007',
+    '20000000-0000-0000-0000-000000000008',
+    '20000000-0000-0000-0000-000000000009',
+    '20000000-0000-0000-0000-000000000010'
+  );
+"
+
 run_sql location_service location_service "
   DELETE FROM locations.locations
   WHERE id NOT IN (
@@ -187,7 +215,7 @@ echo ""
 echo "--- SQS queues ---"
 
 LOCALSTACK="accountabilityatlas-localstack-1"
-for queue in video-events video-events-dlq moderation-events moderation-events-dlq search-moderation-events search-moderation-events-dlq user-events user-events-dlq video-status-events video-status-events-dlq; do
+for queue in video-events video-events-dlq moderation-events moderation-events-dlq search-moderation-events search-moderation-events-dlq user-events user-events-dlq video-status-events video-status-events-dlq user-video-events user-video-events-dlq user-video-status-events user-video-status-events-dlq; do
   docker exec "$LOCALSTACK" awslocal sqs purge-queue \
     --queue-url "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/$queue" 2>/dev/null \
     && echo "Purged $queue" || echo "Skipped $queue (empty or not found)"
