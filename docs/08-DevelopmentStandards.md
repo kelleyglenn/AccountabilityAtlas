@@ -470,6 +470,21 @@ tasks.withType(Test).configureEach {
 }
 ```
 
+#### Jest Coverage Thresholds
+
+The web-app enforces test coverage via Jest's `coverageThreshold` in `jest.config.js`. The **global** threshold acts as a safety net — any new file shipped with 0% coverage drags down the global average and fails `npm run check` locally, before a PR is ever created.
+
+| Scope | Statements | Branches | Functions | Lines |
+|-------|-----------|----------|-----------|-------|
+| **Global (safety net)** | 75% | 65% | 70% | 75% |
+| `src/hooks/` | 80% | 80% | 80% | 80% |
+| `src/lib/` | 80% | 70% | 80% | 80% |
+| `src/providers/` | 90% | 90% | 90% | 90% |
+| `src/components/ui/` | 80% | 70% | 80% | 80% |
+| `src/components/map/` | 55% | 55% | 50% | 55% |
+
+Per-directory thresholds should be bumped as coverage improves — they are a ratchet, not a ceiling.
+
 #### Required Dependencies
 
 ```bash
