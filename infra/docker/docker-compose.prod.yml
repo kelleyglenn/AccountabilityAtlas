@@ -246,6 +246,7 @@ services:
     image: ${ECR_REGISTRY}/acct-atlas-web-app:${TAG}
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      SERVER_API_URL: http://api-gateway:8080/api/v1
       NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
