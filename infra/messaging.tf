@@ -5,6 +5,8 @@ locals {
     "moderation-events",
     "search-moderation-events",
     "user-events",
+    "user-video-events",
+    "user-video-status-events",
   ]
 }
 

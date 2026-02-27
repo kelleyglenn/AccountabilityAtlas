@@ -28,6 +28,14 @@ awslocal sqs create-queue --queue-name search-moderation-events-dlq
 awslocal sqs create-queue --queue-name user-events
 awslocal sqs create-queue --queue-name user-events-dlq
 
+# User video events queue (user-service consumer — submission counting)
+awslocal sqs create-queue --queue-name user-video-events
+awslocal sqs create-queue --queue-name user-video-events-dlq
+
+# User video status events queue (user-service consumer — approved/rejected counting)
+awslocal sqs create-queue --queue-name user-video-status-events
+awslocal sqs create-queue --queue-name user-video-status-events-dlq
+
 echo "SQS queues created:"
 awslocal sqs list-queues
 
