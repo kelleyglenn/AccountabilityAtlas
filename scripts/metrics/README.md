@@ -67,13 +67,15 @@ npx jest --coverage --silent
 
 Results are written to `AcctAtlas-web-app/coverage/coverage-summary.json`.
 
-### 5. Endpoint Counts (manual)
+### 5. `collect_endpoint_counts.py` - API Endpoints
 
-Endpoint counts are extracted from OpenAPI specification files (`docs/api-specification.yaml` in each service repo). This was done via a one-time script that parsed the `paths:` section of each YAML file.
+Parses each service's `docs/api-specification.yaml` (OpenAPI 3.1) and counts HTTP methods (GET, POST, PUT, DELETE, PATCH) under the `paths:` section. Uses simple line-based YAML parsing -- no external YAML library required.
+
+```bash
+python scripts/metrics/collect_endpoint_counts.py
+```
 
 **Output:** `scripts/metrics/endpoint_counts.json`
-
-To regenerate, count HTTP methods under `paths:` in each service's `docs/api-specification.yaml`.
 
 ## Running Everything
 
@@ -83,19 +85,22 @@ To regenerate all metrics from scratch:
 # 1. LOC & structural metrics (fast, ~10s)
 python scripts/metrics/collect_loc_metrics.py
 
-# 2. Git & GitHub metrics (~2 min)
+# 2. Endpoint counts (fast, ~1s)
+python scripts/metrics/collect_endpoint_counts.py
+
+# 3. Git & GitHub metrics (~2 min)
 python scripts/metrics/collect_metrics.py
 
-# 3. Build all Java services with coverage (~2-5 min)
+# 4. Build all Java services with coverage (~2-5 min)
 for svc in api-gateway user-service video-service location-service search-service moderation-service; do
   (cd "AcctAtlas-$svc" && ./gradlew check jacocoTestReport) &
 done
 wait
 
-# 4. Extract Java coverage data (fast, ~1s)
+# 5. Extract Java coverage data (fast, ~1s)
 python scripts/metrics/collect_coverage.py
 
-# 5. Web-app Jest coverage (~30s)
+# 6. Web-app Jest coverage (~30s)
 cd AcctAtlas-web-app && npx jest --coverage --silent && cd ..
 ```
 
