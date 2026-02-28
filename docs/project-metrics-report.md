@@ -21,7 +21,7 @@
 
 | Repository | Source | Tests | Config | Migrations | Build | Docs | Other | Total |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| **top-level** | - | - | 285 | - | 138 | 29,045 | 8,482 | 37,950 |
+| **top-level** | - | - | 285 | - | 138 | 29,461 | 10,449 | 40,333 |
 | **user-service** | 2,108 | 3,175 | 149 | 165 | 502 | 4,541 | 341 | 10,981 |
 | **video-service** | 2,361 | 3,120 | 212 | 226 | 503 | 1,615 | 451 | 8,488 |
 | **moderation-service** | 2,245 | 2,947 | 124 | 126 | 495 | 1,802 | 278 | 8,017 |
@@ -31,49 +31,50 @@
 | **location-service** | 1,155 | 1,701 | 120 | 122 | 499 | 1,271 | 266 | 5,134 |
 | **api-gateway** | 183 | 278 | 114 | - | 411 | 683 | 135 | 1,804 |
 | **notification-service** | - | - | - | - | - | 412 | - | 412 |
-| **Overall** | **14,974** | **26,396** | **1,434** | **808** | **3,164** | **43,046** | **15,926** | **105,748** |
+| **Overall** | **14,974** | **26,396** | **1,434** | **808** | **3,164** | **43,462** | **17,893** | **108,131** |
 
-"Other" includes infrastructure (1,323), scripts (4,915), seed data fixtures, and miscellaneous files.
+"Other" includes infrastructure (1,323), scripts (6,879), seed data fixtures, and miscellaneous files.
 
 ### 1.2 Lines of Code by Category (Overall)
 
 | Category | Total Lines | Code Lines | Files | % of Project |
 |---|---:|---:|---:|---:|
-| Documentation | 43,046 | 29,916 | 98 | 40.7% |
-| Tests | 26,396 | 20,321 | 155 | 25.0% |
-| Production source | 14,974 | 12,283 | 236 | 14.2% |
-| Scripts & infra | 6,238 | 4,662 | 45 | 5.9% |
-| Build files | 3,164 | 1,930 | 30 | 3.0% |
-| Config | 1,434 | 1,319 | 43 | 1.4% |
-| Migrations (SQL) | 808 | 719 | 26 | 0.8% |
-| Other | 9,688 | 8,960 | 93 | 9.2% |
-| **Total** | **105,748** | **80,110** | **726** | **100%** |
+| Documentation | 43,462 | 34,242 | 99 | 40.2% |
+| Tests | 26,396 | 20,321 | 155 | 24.4% |
+| Production source | 14,974 | 12,304 | 236 | 13.8% |
+| Other | 9,691 | 9,257 | 93 | 9.0% |
+| Scripts & infra | 8,202 | 6,620 | 51 | 7.6% |
+| Build files | 3,164 | 2,692 | 30 | 2.9% |
+| Config | 1,434 | 1,319 | 43 | 1.3% |
+| Migrations (SQL) | 808 | 719 | 26 | 0.7% |
+| **Total** | **108,131** | **87,474** | **733** | **100%** |
 
 ### 1.3 Language Breakdown
 
 | Language | Total Lines | Code Lines | Files | % of Code |
 |---|---:|---:|---:|---:|
-| Markdown | 38,658 | 25,585 | 93 | 31.9% |
-| Java | 22,341 | 17,156 | 254 | 21.4% |
-| TypeScript (JSX) | 11,866 | 9,899 | 86 | 12.4% |
-| TypeScript | 7,281 | 5,647 | 53 | 7.1% |
-| YAML | 6,981 | 6,573 | 70 | 8.2% |
-| JSON | 5,005 | 5,005 | 7 | 6.3% |
-| Python | 2,236 | 1,778 | 5 | 2.2% |
-| Shell | 3,882 | 2,072 | 22 | 2.6% |
-| SQL | 1,733 | 1,539 | 55 | 1.9% |
-| Gradle (Groovy) | 1,507 | 1,203 | 14 | 1.5% |
-| Terraform/OpenTofu | 651 | 529 | 12 | 0.7% |
-| Other | 3,607 | 3,124 | 55 | 3.9% |
-| **Total** | **105,748** | **80,110** | **726** | **100%** |
+| Markdown | 39,190 | 30,060 | 95 | 34.4% |
+| Java | 22,341 | 17,177 | 254 | 19.6% |
+| TypeScript (JSX) | 11,866 | 9,899 | 86 | 11.3% |
+| TypeScript | 7,281 | 5,647 | 53 | 6.5% |
+| YAML | 6,981 | 6,580 | 70 | 7.5% |
+| JSON | 6,574 | 6,574 | 10 | 7.5% |
+| Shell | 3,882 | 2,971 | 22 | 3.4% |
+| Python | 2,515 | 1,986 | 7 | 2.3% |
+| SQL | 1,733 | 1,539 | 55 | 1.8% |
+| Gradle (Groovy) | 1,507 | 1,203 | 14 | 1.4% |
+| XML | 874 | 874 | 2 | 1.0% |
+| Terraform/OpenTofu | 651 | 529 | 12 | 0.6% |
+| Other | 2,736 | 2,435 | 53 | 2.8% |
+| **Total** | **108,131** | **87,474** | **733** | **100%** |
 
-**Primary application languages**: Java (17,156 LOC) + TypeScript/TSX (15,546 LOC) = **32,702 LOC** of application code.
+**Primary application languages**: Java (17,177 LOC) + TypeScript/TSX (15,546 LOC) = **32,723 LOC** of application code.
 
 ### 1.4 File Counts by Repository
 
 | Repository | Source | Test | Config | Migration | Build | Docs | Other | Total |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| top-level | - | - | 2 | - | 3 | 57 | 56 | 118 |
+| top-level | - | - | 2 | - | 3 | 58 | 62 | 125 |
 | user-service | 52 | 25 | 5 | 9 | 4 | 8 | 17 | 120 |
 | video-service | 36 | 14 | 5 | 7 | 4 | 4 | 14 | 84 |
 | moderation-service | 36 | 17 | 5 | 3 | 4 | 4 | 10 | 79 |
@@ -83,7 +84,7 @@
 | location-service | 22 | 13 | 5 | 5 | 4 | 4 | 12 | 65 |
 | api-gateway | 5 | 4 | 4 | - | 4 | 3 | 6 | 26 |
 | notification-service | - | - | - | - | - | 2 | - | 2 |
-| **Overall** | **236** | **155** | **43** | **26** | **30** | **98** | **138** | **726** |
+| **Overall** | **236** | **155** | **43** | **26** | **30** | **99** | **144** | **733** |
 
 ---
 
@@ -188,7 +189,7 @@ For context, this represents a medium-sized application. The COCOMO II model wou
 | **Test-to-source ratio** | 1.76:1 (26,396 test LOC / 14,974 source LOC) |
 | **Avg source file size** | 63 lines (14,974 / 236 files) |
 | **Avg test file size** | 170 lines (26,396 / 155 files) |
-| **Documentation ratio** | 2.87:1 (43,046 doc LOC / 14,974 source LOC) |
+| **Documentation ratio** | 2.90:1 (43,462 doc LOC / 14,974 source LOC) |
 | **Migration files** | 26 SQL migrations across 5 services |
 | **Total test files** | 155 (unit + integration + E2E) |
 | **CI/CD workflows** | Present in all active service repos |
@@ -203,9 +204,9 @@ For context, this represents a medium-sized application. The COCOMO II model wou
 | location-service | **93.5%** | 81.5% | 94.9% | 91.9% | 371 / 397 |
 | api-gateway | **91.4%** | 75.0% | 94.2% | 78.6% | 53 / 58 |
 | moderation-service | **84.4%** | 77.3% | 84.3% | 84.7% | 615 / 729 |
-| **Weighted avg** | **93.2%** | **80.0%** | **93.4%** | **91.2%** | **2,674 / 2,877** |
+| **Weighted avg** | **92.9%** | **79.9%** | **93.3%** | **91.5%** | **2,674 / 2,877** |
 
-All services exceed the **80% coverage target**. Weighted average line coverage is **93.2%**.
+All services exceed the **80% coverage target**. Weighted average line coverage is **92.9%**.
 
 ### 3.3 Test Coverage - Web Frontend (Jest)
 
@@ -243,10 +244,10 @@ All 6 active Java services pass the full quality gate:
 
 | Dimension | Rating | Notes |
 |---|---|---|
-| Test coverage (backend) | Excellent | 93.2% line coverage, all services > 80% |
+| Test coverage (backend) | Excellent | 92.9% line coverage, all services > 80% |
 | Test coverage (frontend) | Good | 79.7% line, 71.2% branch |
 | Test-to-code ratio | Excellent | 1.76x more test code than source |
-| Documentation ratio | Excellent | 2.87x more docs than source |
+| Documentation ratio | Excellent | 2.90x more docs than source |
 | Static analysis | Excellent | All checks pass, no violations |
 | Architectural consistency | Excellent | All services follow same layered pattern |
 
@@ -267,16 +268,16 @@ All 6 active Java services pass the full quality gate:
 
 | Metric | Value |
 |---|---:|
-| **Total commits** | 305 |
-| **Commits per day** (avg) | 11.3 |
-| **Claude co-authored commits** | 211 (69.2%) |
-| **Human-only commits** | 94 (30.8%) |
+| **Total commits** | 308 |
+| **Commits per day** (avg) | 11.4 |
+| **Claude co-authored commits** | 96 (31.2%) |
+| **Human-only commits** | 212 (68.8%) |
 
 **Commits by Repository:**
 
 | Repository | Commits | First Commit | Latest Commit |
 |---|---:|---|---|
-| top-level (AccountabilityAtlas) | 77 | Jan 31 | Feb 26 |
+| top-level (AccountabilityAtlas) | 80 | Jan 31 | Feb 27 |
 | integration-tests | 42 | Feb 7 | Feb 25 |
 | video-service | 37 | Jan 31 | Feb 26 |
 | user-service | 33 | Jan 31 | Feb 26 |
@@ -291,22 +292,22 @@ All 6 active Java services pass the full quality gate:
 
 | Metric | Value |
 |---|---:|
-| **Total lines added** | 117,036 |
-| **Total lines removed** | 5,796 |
-| **Net lines** | 111,240 |
-| **Lines added per day** (avg) | 4,335 |
-| **Churn rate** | 5.0% (lines removed / lines added) |
+| **Total lines added** | 118,550 |
+| **Total lines removed** | 5,804 |
+| **Net lines** | 112,746 |
+| **Lines added per day** (avg) | 4,391 |
+| **Churn rate** | 4.9% (lines removed / lines added) |
 
 **Lines by Repository:**
 
 | Repository | Added | Removed | Net | % of Total |
 |---|---:|---:|---:|---:|
-| top-level | 37,123 | 1,819 | 35,304 | 31.7% |
-| web-app | 28,777 | 1,059 | 27,718 | 24.9% |
-| user-service | 11,111 | 189 | 10,922 | 9.8% |
-| integration-tests | 9,425 | 1,482 | 7,943 | 7.1% |
-| video-service | 8,760 | 439 | 8,321 | 7.5% |
-| moderation-service | 8,372 | 349 | 8,023 | 7.2% |
+| top-level | 38,637 | 1,827 | 36,810 | 32.6% |
+| web-app | 28,777 | 1,059 | 27,718 | 24.6% |
+| user-service | 11,111 | 189 | 10,922 | 9.7% |
+| integration-tests | 9,425 | 1,482 | 7,943 | 7.0% |
+| video-service | 8,760 | 439 | 8,321 | 7.4% |
+| moderation-service | 8,372 | 349 | 8,023 | 7.1% |
 | search-service | 5,802 | 332 | 5,470 | 4.9% |
 | location-service | 5,259 | 109 | 5,150 | 4.6% |
 | api-gateway | 1,951 | 13 | 1,938 | 1.7% |
@@ -318,7 +319,7 @@ All 6 active Java services pass the full quality gate:
 |---|---:|
 | **Total merged PRs** | 193 |
 | **PRs per day** (avg) | 7.1 |
-| **PR-to-commit ratio** | 0.63 (193 PRs / 305 commits) |
+| **PR-to-commit ratio** | 0.63 (193 PRs / 308 commits) |
 
 **PRs by Repository:**
 
@@ -363,8 +364,8 @@ All 6 active Java services pass the full quality gate:
 
 | Metric | Per Day | Per Week | Total |
 |---|---:|---:|---:|
-| Commits | 11.3 | 79.1 | 305 |
-| Lines of code added | 4,335 | 30,345 | 117,036 |
+| Commits | 11.4 | 79.8 | 308 |
+| Lines of code added | 4,391 | 30,737 | 118,550 |
 | PRs merged | 7.1 | 49.7 | 193 |
 | Issues closed | 5.4 | 37.8 | 147 |
 
@@ -372,7 +373,7 @@ All 6 active Java services pass the full quality gate:
 
 | Metric | Value |
 |---|---|
-| Claude co-authored commits | 211 / 305 (69.2%) |
+| Claude co-authored commits | 96 / 308 (31.2%) |
 | Human-AI collaboration model | Human-directed, AI-implemented |
 | Quality gate compliance | 100% - all services pass all checks |
 
@@ -384,15 +385,15 @@ All 6 active Java services pass the full quality gate:
 
 | Metric | Source | Tool |
 |---|---|---|
-| Lines of code | File system analysis | Custom Python script |
-| Endpoints | OpenAPI specification YAML files | Manual count from specs |
-| Domain annotations | Source code grep | Custom Python script |
-| Branching complexity | Source code regex matching | Custom Python script |
+| Lines of code | File system analysis | `collect_loc_metrics.py` |
+| Endpoints | OpenAPI specification YAML files | `collect_endpoint_counts.py` |
+| Domain annotations | Source code grep | `collect_loc_metrics.py` |
+| Branching complexity | Source code regex matching | `collect_loc_metrics.py` |
 | Function points | IFPUG simplified methodology | Manual estimation |
-| Test coverage (Java) | JaCoCo XML/CSV reports | `./gradlew check jacocoTestReport` |
+| Test coverage (Java) | JaCoCo XML/CSV reports | `collect_coverage.py` |
 | Test coverage (JS) | Jest coverage reports | `npx jest --coverage` |
-| Git metrics | Git log analysis | `git rev-list`, `git log --numstat` |
-| GitHub metrics | GitHub API | `gh pr list`, `gh issue list` |
+| Git metrics | Git log analysis | `collect_metrics.py` |
+| GitHub metrics | GitHub API | `collect_metrics.py` |
 
 ### Definitions
 
@@ -403,6 +404,7 @@ All 6 active Java services pass the full quality gate:
 - **Estimated CC**: Simplified cyclomatic complexity approximation, not equivalent to formal CC measurement
 - **Function Points**: Estimated using simplified IFPUG methodology; actual FP analysis may differ
 - **Coverage**: Measured on hand-written source code only; generated code (OpenAPI models/APIs) excluded
+- **Comment detection**: Language-aware (C-style `//` `/* */` for Java/TS/CSS/Gradle; `#` for Python/Shell/YAML; no comments for Markdown/JSON/XML/SQL)
 
 ### Scripts
 
@@ -410,6 +412,7 @@ Collection scripts are located in `scripts/metrics/`:
 - `collect_loc_metrics.py` - LOC, language, complexity, annotation analysis
 - `collect_metrics.py` - Git and GitHub metrics
 - `collect_coverage.py` - JaCoCo coverage extraction
+- `collect_endpoint_counts.py` - API endpoint counts from OpenAPI specs
 
 ---
 

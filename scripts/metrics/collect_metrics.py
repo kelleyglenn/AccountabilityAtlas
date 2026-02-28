@@ -1,3 +1,15 @@
+"""Collect git and GitHub metrics across all AccountabilityAtlas repos.
+
+Gathers commit counts, lines added/removed, Claude co-authorship stats,
+merged PR counts, and issue counts for each repository.
+
+Usage:
+    python scripts/metrics/collect_metrics.py
+
+Output:
+    scripts/metrics/git_metrics.json
+"""
+
 import subprocess
 import json
 import sys
@@ -6,9 +18,8 @@ from datetime import datetime, timezone
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-# Git paths use Windows-style (subprocess on Windows uses cmd.exe)
-# GitHub paths use actual owner from remote URLs
-BASE = os.path.join("C:" + os.sep, "code", "AccountabilityAtlas")
+# Resolve project root relative to this script: scripts/metrics/ -> project root
+BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REPOS = [
     (BASE, "kelleyglenn/AccountabilityAtlas"),
     (os.path.join(BASE, "AcctAtlas-api-gateway"), "kelleyglenn/AcctAtlas-api-gateway"),
@@ -52,7 +63,7 @@ def collect_git_metrics(repo_path):
 
     out = run(f'git -C "{repo_path}" log --reverse --format=%aI')
     if out:
-        metrics["first_commit_date"] = out.split(chr(10))[0].strip()
+        metrics["first_commit_date"] = out.split("\n")[0].strip()
     else:
         metrics["first_commit_date"] = None
 
@@ -62,8 +73,8 @@ def collect_git_metrics(repo_path):
     out = run(f'git -C "{repo_path}" log --numstat --format=""')
     la, lr = 0, 0
     if out:
-        for line in out.split(chr(10)):
-            parts = line.split(chr(9))
+        for line in out.split("\n"):
+            parts = line.split("\t")
             if len(parts) >= 2:
                 try:
                     la += int(parts[0])
@@ -73,9 +84,9 @@ def collect_git_metrics(repo_path):
     metrics["lines_added"] = la
     metrics["lines_removed"] = lr
 
-    out = run(f'git -C "{repo_path}" log --all --grep="Co-Authored-By: Claude" --oneline')
+    out = run(f'git -C "{repo_path}" log --grep="Co-Authored-By: Claude" --oneline')
     if out:
-        metrics["claude_coauthored_commits"] = len(out.strip().split(chr(10)))
+        metrics["claude_coauthored_commits"] = len(out.strip().split("\n"))
     else:
         metrics["claude_coauthored_commits"] = 0
 

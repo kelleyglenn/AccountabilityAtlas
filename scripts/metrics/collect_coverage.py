@@ -21,7 +21,7 @@ from pathlib import Path
 # Use UTF-8 for stdout on Windows
 sys.stdout.reconfigure(encoding="utf-8")
 
-BASE_DIR = Path(r"C:\code\AccountabilityAtlas")
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 OUTPUT_FILE = BASE_DIR / "scripts" / "metrics" / "coverage_data.json"
 
 SERVICES = {

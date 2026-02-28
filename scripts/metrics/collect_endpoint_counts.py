@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-ROOT = Path(r"C:\code\AccountabilityAtlas")
+ROOT = Path(__file__).resolve().parent.parent.parent
 OUTPUT = ROOT / "scripts" / "metrics" / "endpoint_counts.json"
 
 HTTP_METHODS = ("get", "post", "put", "delete", "patch")

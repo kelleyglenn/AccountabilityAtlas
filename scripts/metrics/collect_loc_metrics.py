@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Collect LOC, endpoint, complexity, and structural metrics across all repos."""
+"""Collect LOC, complexity, and structural metrics across all repos."""
 
 import json
 import os
@@ -10,7 +10,8 @@ from collections import defaultdict
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-ROOT = Path(r"C:\code\AccountabilityAtlas")
+# Resolve project root relative to this script: scripts/metrics/ -> project root
+ROOT = Path(__file__).resolve().parent.parent.parent
 OUTPUT = ROOT / "scripts" / "metrics" / "loc_metrics.json"
 
 REPOS = {
@@ -48,10 +49,15 @@ def should_skip_file(filepath):
     name = filepath.name.lower()
     if name in ("package-lock.json", "gradlew.bat"):
         return True
-    for ext in SKIP_EXTENSIONS:
-        if name.endswith(ext):
-            return True
-    return False
+    return filepath.suffix.lower() in SKIP_EXTENSIONS
+
+
+# Languages where // and /* */ are comment syntax
+C_STYLE_COMMENT_EXTS = {".java", ".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".gradle"}
+# Languages where # is comment syntax
+HASH_COMMENT_EXTS = {".py", ".sh", ".bash", ".yml", ".yaml", ".properties", ".tf", ".hcl", ".toml"}
+# Languages with no comment counting (content is all "code")
+NO_COMMENT_EXTS = {".md", ".json", ".xml", ".html", ".sql"}
 
 
 def count_lines(filepath):
@@ -61,19 +67,35 @@ def count_lines(filepath):
         total = len(lines)
         blank = sum(1 for line in lines if line.strip() == "")
         comment = 0
-        in_block = False
-        for line in lines:
-            stripped = line.strip()
-            if in_block:
-                comment += 1
-                if "*/" in stripped:
-                    in_block = False
-            elif stripped.startswith("//") or stripped.startswith("#") or (stripped.startswith("*") and not stripped.startswith("*/")):
-                comment += 1
-            elif stripped.startswith("/*"):
-                comment += 1
-                if "*/" not in stripped:
-                    in_block = True
+        suffix = filepath.suffix.lower()
+        name = filepath.name.lower()
+
+        if name == "dockerfile":
+            suffix = ".sh"  # Dockerfile uses # comments
+
+        if suffix in C_STYLE_COMMENT_EXTS:
+            in_block = False
+            for line in lines:
+                stripped = line.strip()
+                if in_block:
+                    comment += 1
+                    if "*/" in stripped:
+                        in_block = False
+                elif stripped.startswith("//"):
+                    comment += 1
+                elif stripped.startswith("/*"):
+                    comment += 1
+                    if "*/" not in stripped:
+                        in_block = True
+                elif stripped.startswith("* ") or stripped == "*":
+                    comment += 1
+        elif suffix in HASH_COMMENT_EXTS:
+            for line in lines:
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    comment += 1
+        # For NO_COMMENT_EXTS and unknown types, comment stays 0
+
         code = total - blank - comment
         return {"total": total, "code": max(0, code), "blank": blank, "comment": comment}
     except Exception:
@@ -202,25 +224,6 @@ def get_language(filepath):
     return lang_map.get(suffix, "Other")
 
 
-def count_endpoints(filepath):
-    endpoints = {"GET": 0, "POST": 0, "PUT": 0, "DELETE": 0, "PATCH": 0}
-    try:
-        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-            content = f.read()
-        if filepath.suffix == ".java":
-            endpoints["GET"] = len(re.findall(r"@GetMapping", content))
-            endpoints["POST"] = len(re.findall(r"@PostMapping", content))
-            endpoints["PUT"] = len(re.findall(r"@PutMapping", content))
-            endpoints["DELETE"] = len(re.findall(r"@DeleteMapping", content))
-            endpoints["PATCH"] = len(re.findall(r"@PatchMapping", content))
-            for m in re.findall(r"@RequestMapping\([^)]*method\s*=\s*RequestMethod\.(\w+)", content):
-                if m in endpoints:
-                    endpoints[m] += 1
-    except Exception:
-        pass
-    return endpoints
-
-
 def count_complexity(filepath):
     complexity = {
         "if_statements": 0, "else_if": 0, "else_blocks": 0,
@@ -330,7 +333,6 @@ def analyze_repo(repo_name, repo_root):
         "name": repo_name,
         "loc": {},
         "languages": {},
-        "endpoints": {"GET": 0, "POST": 0, "PUT": 0, "DELETE": 0, "PATCH": 0, "total": 0},
         "complexity": {
             "if_statements": 0, "else_if": 0, "else_blocks": 0,
             "switch_cases": 0, "catch_blocks": 0, "ternary": 0,
@@ -380,9 +382,6 @@ def analyze_repo(repo_name, repo_root):
             result["file_count"] += 1
 
             if category == "source":
-                ep = count_endpoints(filepath)
-                for method, count in ep.items():
-                    result["endpoints"][method] += count
                 cx = count_complexity(filepath)
                 for key, val in cx.items():
                     result["complexity"][key] += val
@@ -398,7 +397,6 @@ def analyze_repo(repo_name, repo_root):
                 for key, val in cx.items():
                     result["complexity"][key] += val
 
-    result["endpoints"]["total"] = sum(result["endpoints"][m] for m in ("GET", "POST", "PUT", "DELETE", "PATCH"))
     if repo_name == "web-app":
         result["nextjs_routes"] = count_nextjs_routes(repo_root)
 
@@ -433,7 +431,6 @@ def main():
     overall = {
         "total_loc": {"total": 0, "code": 0, "blank": 0, "comment": 0},
         "file_count": 0,
-        "endpoints": {"GET": 0, "POST": 0, "PUT": 0, "DELETE": 0, "PATCH": 0, "total": 0},
         "complexity": {
             "if_statements": 0, "else_if": 0, "else_blocks": 0,
             "switch_cases": 0, "catch_blocks": 0, "ternary": 0,
@@ -452,9 +449,6 @@ def main():
         overall["total_loc"]["blank"] += repo["total_loc"]["blank"]
         overall["total_loc"]["comment"] += repo["total_loc"]["comment"]
         overall["file_count"] += repo["file_count"]
-        for method in ("GET", "POST", "PUT", "DELETE", "PATCH"):
-            overall["endpoints"][method] += repo["endpoints"][method]
-        overall["endpoints"]["total"] += repo["endpoints"]["total"]
         for key in overall["complexity"]:
             overall["complexity"][key] += repo["complexity"].get(key, 0)
         for lang, data in repo["languages"].items():
@@ -479,15 +473,14 @@ def main():
     print(f"Code lines:  {overall['total_loc']['code']:,}")
     print(f"Blank lines: {overall['total_loc']['blank']:,}")
     print(f"Comments:    {overall['total_loc']['comment']:,}")
-    print(f"Endpoints:   {overall['endpoints']['total']}")
     print(f"Est. CC:     {overall['estimated_cyclomatic_complexity']:,}")
     print(f"{'='*50}")
 
     # Per-repo summary
-    print(f"\n{'Repo':<25} {'Files':>6} {'Total':>8} {'Code':>8} {'Endpoints':>10}")
-    print("-" * 60)
+    print(f"\n{'Repo':<25} {'Files':>6} {'Total':>8} {'Code':>8}")
+    print("-" * 50)
     for name, repo in all_metrics["repos"].items():
-        print(f"{name:<25} {repo['file_count']:>6} {repo['total_loc']['total']:>8,} {repo['total_loc']['code']:>8,} {repo['endpoints']['total']:>10}")
+        print(f"{name:<25} {repo['file_count']:>6} {repo['total_loc']['total']:>8,} {repo['total_loc']['code']:>8,}")
 
 
 if __name__ == "__main__":
