@@ -40,6 +40,9 @@ logs/*
 coverage/
 .nyc_output/
 
+# Generated metrics data
+scripts/metrics/*.json
+
 # OpenTofu / Terraform
 infra/.terraform/
 infra/*.tfstate
